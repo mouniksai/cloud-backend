@@ -73,6 +73,14 @@ exports.registerUser = async (req, res) => {
 
         const token = jwt.sign({ user_id: result.userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
+        // Set secure cookie
+        res.cookie('voteGuardToken', token, {
+            httpOnly: false, // Allow frontend JavaScript access
+            secure: process.env.NODE_ENV === 'production', // HTTPS in production
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 1000 // 1 hour
+        });
+
         res.json({ token, user: result });
 
     } catch (err) {
@@ -98,16 +106,16 @@ exports.loginUser = async (req, res) => {
         // --- NEW: GENERATE OTP ---
         // 1. Generate secure 6-digit code
         const otp = crypto.randomInt(100000, 999999).toString();
-        
+
         // 2. Set Expiry (5 minutes from now)
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
         // 3. Save to DB
         await prisma.user.update({
             where: { userId: user.userId },
-            data: { 
-                otpCode: otp, 
-                otpExpiresAt: expiresAt 
+            data: {
+                otpCode: otp,
+                otpExpiresAt: expiresAt
             }
         });
 
@@ -152,26 +160,60 @@ exports.verifyOtp = async (req, res) => {
         }
 
         // --- SUCCESS! ---
-        
+
         // 1. Clear OTP fields (Security best practice)
         await prisma.user.update({
             where: { userId },
             data: { otpCode: null, otpExpiresAt: null }
         });
 
-        // 2. Generate Token
-        const token = jwt.sign({ user_id: user.userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        // 2. Generate Token (UPDATED)
+        // We added 'role: user.role' here so the middleware can verify admin access
+        const token = jwt.sign(
+            {
+                user_id: user.userId,
+                role: user.role      // <--- THIS IS THE CRITICAL FIX
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
 
-        // 3. Send final data
-        res.json({ 
-            token, 
-            user: { 
-                username: user.username, 
-                fullName: user.citizen.fullName,
-                role: user.role 
-            } 
+        // Set secure cookie
+        res.cookie('voteGuardToken', token, {
+            httpOnly: false, // Allow frontend JavaScript access
+            secure: process.env.NODE_ENV === 'production', // HTTPS in production
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 1000 // 1 hour
         });
 
+        // 3. Send final data
+        res.json({
+            token,
+            user: {
+                username: user.username,
+                fullName: user.citizen.fullName,
+                role: user.role
+            }
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// 5. LOGOUT USER (Clear cookies)
+exports.logoutUser = async (req, res) => {
+    try {
+        // Clear the cookie
+        res.clearCookie('voteGuardToken', {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/'
+        });
+
+        res.json({ message: "Logged out successfully" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server Error" });

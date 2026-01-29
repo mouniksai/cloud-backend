@@ -14,19 +14,44 @@ exports.getDashboardData = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // 2. Fetch Active Elections for THIS User's Constituency
-        // (Attribute-Based Access Control)
+        // AND check if user has NOT already voted
         const activeElection = await prisma.election.findFirst({
             where: {
                 constituency: user.citizen.constituency,
-                status: "LIVE"
+                status: "LIVE",
+                // Exclude elections where user has already voted
+                NOT: {
+                    votes: {
+                        some: {
+                            userId: userId
+                        }
+                    }
+                }
             }
         });
 
-        // 3. Fetch Audit Logs (Voting History placeholder)
-        // In real app, query 'votes' table. For now, we return empty or mock.
-        const history = [
-            { id: 1, election: "2024 Municipal Council", date: "12 Feb 2024", txHash: "0x7f...8a", status: "Confirmed" }
-        ];
+        // 3. Fetch User's Actual Voting History
+        const userVotes = await prisma.vote.findMany({
+            where: { userId },
+            include: {
+                election: true,
+                candidate: true
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+
+        const history = userVotes.map(vote => ({
+            id: vote.id,
+            election: vote.election.title,
+            candidate: vote.candidate.name,
+            date: vote.timestamp.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            }),
+            receiptHash: vote.receiptHash,
+            status: "Confirmed"
+        }));
 
         // 4. Construct Response matching your Frontend Props
         const dashboardData = {

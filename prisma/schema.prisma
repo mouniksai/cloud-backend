@@ -10,20 +10,16 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 1. Govt Registry (Updated with Constituency)
+// 1. USERS & CITIZENS
 model GovtRegistry {
-  citizenId    String   @id @unique @map("citizen_id") @db.VarChar(12)
-  fullName     String   @map("full_name") @db.VarChar(100)
+  citizenId    String   @id @unique @map("citizen_id")
+  fullName     String   @map("full_name")
+  constituency String   @default("General")
+  ward         String   @default("Ward A")
   dob          DateTime @db.Date
-  state        String?  @db.VarChar(50)
-  
-  // NEW: Location data for election mapping
-  constituency String   @default("General") @db.VarChar(100) 
-  ward         String   @default("Ward A") @db.VarChar(100)
-
-  gender       String?  @db.VarChar(10)
-  email        String   @unique @db.VarChar(100)
-  mobile       String   @unique @db.VarChar(15)
+  gender       String?
+  email        String   @unique
+  mobile       String   @unique
   photoUrl     String?  @map("photo_url")
   isRegistered Boolean  @default(false) @map("is_registered")
 
@@ -31,49 +27,88 @@ model GovtRegistry {
   @@map("govt_registry")
 }
 
-// 2. User Table
 model User {
   userId       String   @id @default(uuid()) @map("user_id") @db.Uuid
-  username     String   @unique @db.VarChar(50)
+  username     String   @unique
   passwordHash String   @map("password_hash")
-  role         String   @default("voter") @db.VarChar(20) // 'voter' or 'admin'
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  // MFA Fields
+  role         String   @default("voter")
+  
+  // OTP fields for 2FA
   otpCode      String?  @map("otp_code")
   otpExpiresAt DateTime? @map("otp_expires_at")
-
+  
   citizenId    String       @unique @map("citizen_id")
   citizen      GovtRegistry @relation(fields: [citizenId], references: [citizenId])
-
-  AuditLogs    AuditLog[]   // Relation to logs
+  
+  votes        Vote[]
+  auditLogs    AuditLog[]
 
   @@map("users")
 }
 
-// 3. NEW: Election Table
+// 2. ELECTION MODULE
 model Election {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   title         String
   description   String
-  constituency  String   // Only voters in this constituency see this election
-  startTime     DateTime @map("start_time")
-  endTime       DateTime @map("end_time")
-  status        String   @default("UPCOMING") // UPCOMING, LIVE, ENDED
-  createdAt     DateTime @default(now())
-
+  constituency  String
+  startTime     DateTime    @map("start_time")
+  endTime       DateTime    @map("end_time")
+  status        String      @default("UPCOMING") // UPCOMING, LIVE, ENDED
+  
+  candidates    Candidate[]
+  votes         Vote[]
+  
   @@map("elections")
 }
 
+model Candidate {
+  id          String   @id @default(uuid())
+  name        String
+  party       String
+  symbol      String   // E.g., "🌳", "⭐"
+  keyPoints   String[] // Manifesto points
+  voteCount   Int      @default(0) // Fast analytics counter
 
+  electionId  String   @map("election_id")
+  election    Election @relation(fields: [electionId], references: [id])
+  
+  votes       Vote[]
 
+  @@map("candidates")
+}
+
+// 3. SECURE VOTE LEDGER
+model Vote {
+  id            String   @id @default(uuid())
+  
+  // Who voted?
+  userId        String   @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [userId])
+
+  // Which election?
+  electionId    String   @map("election_id")
+  election      Election @relation(fields: [electionId], references: [id])
+
+  // Who did they choose?
+  candidateId   String   @map("candidate_id")
+  candidate     Candidate @relation(fields: [candidateId], references: [id])
+
+  // CYBER SECURITY COMPONENT: Receipt Hash
+  // Instead of blockchain, we store a SHA-256 hash of the vote details.
+  receiptHash   String   @unique @map("receipt_hash")
+  timestamp     DateTime @default(now())
+
+  // CRITICAL: Composite unique key prevents double voting at the Database Level
+  @@unique([userId, electionId]) 
+  @@map("votes")
+}
+
+// 4. AUDIT LOGS (Non-Repudiation)
 model AuditLog {
   id        String   @id @default(uuid())
-  
-  // FIX IS HERE: Added @db.Uuid to match the User table
-  userId    String   @map("user_id") @db.Uuid 
-  
-  action    String   // e.g., "CREATED_ELECTION", "VIEWED_DASHBOARD"
+  userId    String   @map("user_id") @db.Uuid
+  action    String   
   details   String?
   ipAddress String?  @map("ip_address")
   timestamp DateTime @default(now())

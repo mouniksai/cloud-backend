@@ -16,6 +16,7 @@ app.use(cookieParser()); // Add cookie parser middleware
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/admin', require('./src/routes/adminRoutes'));
 app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
+app.use('/api/vote', require('./src/routes/voteRoutes')); // <--- NEW
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {

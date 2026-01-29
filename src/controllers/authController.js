@@ -1,6 +1,12 @@
-const prisma = require('../config/db'); // Import the Prisma Client
+// src/controllers/authController.js
+const prisma = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // Built-in Node module
+const dotenv = require('dotenv');
+dotenv.config();
+const { sendEmailOTP } = require('../utils/emailService');
+
 
 // 1. VERIFY IDENTITY
 exports.verifyCitizen = async (req, res) => {
@@ -75,32 +81,96 @@ exports.registerUser = async (req, res) => {
     }
 };
 
-// 3. LOGIN USER
+// 3. LOGIN USER (STEP 1: Password Check -> Generate OTP)
 exports.loginUser = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        // Find user and include their citizen details in one query!
         const user = await prisma.user.findUnique({
-            where: { username: username },
-            include: { citizen: true } // JOINs the tables automatically
+            where: { username },
+            include: { citizen: true }
         });
 
-        if (!user) {
+        if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
             return res.status(401).json({ message: "Invalid Credentials" });
         }
 
-        const validPassword = await bcrypt.compare(password, user.passwordHash);
-        if (!validPassword) {
-            return res.status(401).json({ message: "Invalid Credentials" });
+        // --- NEW: GENERATE OTP ---
+        // 1. Generate secure 6-digit code
+        const otp = crypto.randomInt(100000, 999999).toString();
+        
+        // 2. Set Expiry (5 minutes from now)
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        // 3. Save to DB
+        await prisma.user.update({
+            where: { userId: user.userId },
+            data: { 
+                otpCode: otp, 
+                otpExpiresAt: expiresAt 
+            }
+        });
+
+        // 4. Send Email (Get email from linked citizen record)
+        const emailSent = await sendEmailOTP(user.citizen.email, otp);
+
+        // 5. Response (Tell frontend to go to 2FA screen)
+        res.status(200).json({
+            message: "Password verified",
+            requires2FA: true,
+            userId: user.userId, // Frontend needs this to verify OTP
+            maskedEmail: user.citizen.email.replace(/(.{2})(.*)(?=@)/, "$1***"),
+            maskedMobile: user.citizen.mobile.replace(/\d(?=\d{4})/g, "*") // Just for UI display
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+// 4. VERIFY OTP (STEP 2: Final Token Issue)
+exports.verifyOtp = async (req, res) => {
+    try {
+        const { userId, otp } = req.body;
+
+        const user = await prisma.user.findUnique({
+            where: { userId },
+            include: { citizen: true }
+        });
+
+        if (!user) return res.status(400).json({ message: "User not found" });
+
+        // Check 1: Is OTP correct?
+        if (user.otpCode !== otp) {
+            return res.status(400).json({ message: "Invalid OTP Code" });
         }
 
+        // Check 2: Is OTP expired?
+        if (new Date() > new Date(user.otpExpiresAt)) {
+            return res.status(400).json({ message: "OTP has expired. Login again." });
+        }
+
+        // --- SUCCESS! ---
+        
+        // 1. Clear OTP fields (Security best practice)
+        await prisma.user.update({
+            where: { userId },
+            data: { otpCode: null, otpExpiresAt: null }
+        });
+
+        // 2. Generate Token
         const token = jwt.sign({ user_id: user.userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-        // Remove sensitive hash before sending back
-        const { passwordHash, ...userData } = user;
-
-        res.json({ token, user: userData });
+        // 3. Send final data
+        res.json({ 
+            token, 
+            user: { 
+                username: user.username, 
+                fullName: user.citizen.fullName,
+                role: user.role 
+            } 
+        });
 
     } catch (err) {
         console.error(err);

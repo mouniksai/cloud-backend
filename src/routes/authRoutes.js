@@ -4,22 +4,12 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.post('/verify-citizen', authController.verifyCitizen);
 router.post('/register', authController.registerUser);
-router.post('/login', authController.loginUser);
-router.get('/dashboard', authMiddleware, async (req, res) => {
-    try {
-        // req.user comes from the middleware!
-        // We can use it to fetch data specific to this user
-        
-        // Example: Fetch user details again (or just return the ID)
-        res.json({ 
-            message: "Welcome to the Secret Dashboard!", 
-            userID: req.user.user_id 
-        });
+router.post('/login', authController.loginUser); // Now returns requires2FA: true
 
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server Error");
-    }
+router.post('/verify-otp', authController.verifyOtp); // NEW ROUTE
+
+router.get('/dashboard', authMiddleware, (req, res) => {
+    res.json({ message: "Secret Dashboard", userId: req.user.user_id });
 });
 
 module.exports = router;

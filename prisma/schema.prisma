@@ -28,7 +28,6 @@ model GovtRegistry {
   @@map("govt_registry") // Maps to the actual SQL table name
 }
 
-// 2. App User Model
 model User {
   userId       String   @id @default(uuid()) @map("user_id") @db.Uuid
   username     String   @unique @db.VarChar(50)
@@ -36,9 +35,13 @@ model User {
   role         String   @default("voter") @db.VarChar(20)
   createdAt    DateTime @default(now()) @map("created_at")
 
-  // Relation Field (Foreign Key)
-  citizenId String       @unique @map("citizen_id")
-  citizen   GovtRegistry @relation(fields: [citizenId], references: [citizenId])
+  // --- NEW FIELDS FOR OTP ---
+  otpCode      String?  @map("otp_code")      // Stores the 6-digit code
+  otpExpiresAt DateTime? @map("otp_expires_at") // Expiration timestamp
+
+  // Relation
+  citizenId    String       @unique @map("citizen_id")
+  citizen      GovtRegistry @relation(fields: [citizenId], references: [citizenId])
 
   @@map("users")
 }

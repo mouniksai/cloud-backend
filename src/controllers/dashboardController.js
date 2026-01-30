@@ -1,9 +1,61 @@
 // src/controllers/dashboardController.js
 const prisma = require('../config/db');
 
+// Helper function to calculate time remaining
+const calculateTimeRemaining = (endTime) => {
+    const now = new Date();
+    const end = new Date(endTime);
+    const diff = end.getTime() - now.getTime();
+
+    if (diff <= 0) return null; // Election has ended
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    return `${hours.toString().padStart(2, '0')}h : ${minutes.toString().padStart(2, '0')}m`;
+};
+
+// Helper function to update election statuses based on current time
+const updateElectionStatuses = async () => {
+    const now = new Date();
+
+    try {
+        // Update elections to LIVE if startTime has passed and status is UPCOMING
+        await prisma.election.updateMany({
+            where: {
+                startTime: {
+                    lte: now
+                },
+                status: 'UPCOMING'
+            },
+            data: {
+                status: 'LIVE'
+            }
+        });
+
+        // Update elections to ENDED if endTime has passed and status is LIVE
+        await prisma.election.updateMany({
+            where: {
+                endTime: {
+                    lte: now
+                },
+                status: 'LIVE'
+            },
+            data: {
+                status: 'ENDED'
+            }
+        });
+    } catch (error) {
+        console.error('Error updating election statuses:', error);
+    }
+};
+
 exports.getDashboardData = async (req, res) => {
     try {
         const userId = req.user.user_id;
+
+        // First, update election statuses based on current time
+        await updateElectionStatuses();
 
         // 1. Fetch User & Citizen Details
         const user = await prisma.user.findUnique({
@@ -14,11 +66,14 @@ exports.getDashboardData = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // 2. Fetch Active Elections for THIS User's Constituency
-        // AND check if user has NOT already voted
+        // Only show LIVE elections where user hasn't voted and election hasn't ended
         const activeElection = await prisma.election.findFirst({
             where: {
                 constituency: user.citizen.constituency,
                 status: "LIVE",
+                endTime: {
+                    gt: new Date() // Election end time is in the future
+                },
                 // Exclude elections where user has already voted
                 NOT: {
                     votes: {
@@ -57,7 +112,7 @@ exports.getDashboardData = async (req, res) => {
         const dashboardData = {
             userSession: {
                 name: user.citizen.fullName,
-                citizenId: user.citizen.citizenId, // Mask this in frontend if needed
+                citizenId: user.citizen.citizenId,
                 constituency: user.citizen.constituency,
                 ward: user.citizen.ward,
                 verified: user.citizen.isRegistered,
@@ -67,7 +122,7 @@ exports.getDashboardData = async (req, res) => {
                 id: activeElection.id,
                 title: activeElection.title,
                 description: activeElection.description,
-                endsIn: "04h : 00m", // You can calculate this based on endTime
+                endsIn: calculateTimeRemaining(activeElection.endTime) || "00h : 00m",
                 status: activeElection.status,
                 eligible: true
             } : null, // If null, frontend should show "No Active Elections"

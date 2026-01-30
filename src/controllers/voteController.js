@@ -2,10 +2,48 @@
 const prisma = require('../config/db');
 const { generateReceiptHash } = require('../utils/cryptoUtils');
 
+// Helper function to update election statuses based on current time
+const updateElectionStatuses = async () => {
+    const now = new Date();
+
+    try {
+        // Update elections to LIVE if startTime has passed and status is UPCOMING
+        await prisma.election.updateMany({
+            where: {
+                startTime: {
+                    lte: now
+                },
+                status: 'UPCOMING'
+            },
+            data: {
+                status: 'LIVE'
+            }
+        });
+
+        // Update elections to ENDED if endTime has passed and status is LIVE
+        await prisma.election.updateMany({
+            where: {
+                endTime: {
+                    lte: now
+                },
+                status: 'LIVE'
+            },
+            data: {
+                status: 'ENDED'
+            }
+        });
+    } catch (error) {
+        console.error('Error updating election statuses:', error);
+    }
+};
+
 // --- 1. GET BALLOT (Fetch Candidates) ---
 exports.getBallot = async (req, res) => {
     try {
         const userId = req.user.user_id;
+
+        // First, update election statuses based on current time
+        await updateElectionStatuses();
 
         // A. Get User's Constituency
         const user = await prisma.user.findUnique({
@@ -15,11 +53,15 @@ exports.getBallot = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        // B. Find LIVE Election for this constituency
+        // B. Find LIVE Election for this constituency that hasn't ended
+        const now = new Date();
         const election = await prisma.election.findFirst({
             where: {
                 constituency: user.citizen.constituency,
-                status: "LIVE"
+                status: "LIVE",
+                endTime: {
+                    gt: now // Election end time is in the future
+                }
             },
             include: {
                 candidates: {
@@ -40,7 +82,7 @@ exports.getBallot = async (req, res) => {
         });
 
         if (existingVote) {
-            return res.status(403).json({ 
+            return res.status(403).json({
                 message: "You have already cast your vote.",
                 hasVoted: true,
                 receiptHash: existingVote.receiptHash,
@@ -72,13 +114,30 @@ exports.castVote = async (req, res) => {
         const userId = req.user.user_id;
         const { electionId, candidateId } = req.body;
 
+        // First, update election statuses
+        await updateElectionStatuses();
+
+        // Check if election is still active and hasn't ended
+        const election = await prisma.election.findUnique({
+            where: { id: electionId }
+        });
+
+        if (!election) {
+            return res.status(404).json({ message: "Election not found." });
+        }
+
+        const now = new Date();
+        if (election.status !== 'LIVE' || election.endTime <= now) {
+            return res.status(400).json({ message: "Election has ended or is not active." });
+        }
+
         // A. Generate Receipt Hash (Integrity)
         const receiptHash = generateReceiptHash(userId, electionId, candidateId);
 
         // B. ATOMIC TRANSACTION
         // Prisma ensures all these 4 steps succeed or fail together.
         const result = await prisma.$transaction(async (tx) => {
-            
+
             // 1. Double-Vote Check (Locking)
             const alreadyVoted = await tx.vote.findUnique({
                 where: { userId_electionId: { userId, electionId } }

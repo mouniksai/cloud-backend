@@ -18,7 +18,9 @@ app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/admin', require('./src/routes/adminRoutes'));
 app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
 app.use('/api/vote', require('./src/routes/voteRoutes'));
-app.use('/api/elections', require('./src/routes/electionRoutes')); // <--- NEW
+app.use('/api/elections', require('./src/routes/electionRoutes')); 
+app.use('/api/verification', require('./src/routes/verificationRoutes'));
+// <--- NEW
 
 const PORT = process.env.PORT || 5001;
 

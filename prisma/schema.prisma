@@ -104,6 +104,10 @@ model Vote {
   // CYBER SECURITY COMPONENT: Receipt Hash
   // Instead of blockchain, we store a SHA-256 hash of the vote details.
   receiptHash   String   @unique @map("receipt_hash")
+  
+  // ENCRYPTION COMPONENT: For Lab Evaluation
+  encryptedDetails String? @map("encrypted_details")
+  
   timestamp     DateTime @default(now())
 
   // CRITICAL: Composite unique key prevents double voting at the Database Level

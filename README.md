@@ -13,19 +13,19 @@ Built with **Node.js** and **Express**, it leverages **Prisma ORM** with **Postg
 ---
 
 ## Table of Contents
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Environment Configuration](#-environment-configuration)
-- [Database Setup](#-database-setup)
-- [API Endpoints](#-api-endpoints)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Configuration](#environment-configuration)
+- [Database Setup](#database-setup)
+- [API Endpoints](#api-endpoints)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-##  Features
+## Features
 
 ###  Secure Authentication & Integrity
 * **JWT Session Management:** Stateless authentication using JSON Web Tokens.
@@ -74,7 +74,7 @@ vote-guard-server/
 
 ```
 
-Getting Started
+## Getting Started
 Prerequisites
 
     Node.js (v18 or higher)
@@ -95,7 +95,7 @@ Installation
     npm install
 ```
 
- Environment Configuration
+## Environment Configuration
 
 Create a .env file in the root directory based on the following template:
 Code snippet

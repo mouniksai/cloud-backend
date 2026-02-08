@@ -124,30 +124,30 @@ We use Prisma to manage the database schema.
 
 Generate the Prisma Client:
 ```
-        npx prisma generate
+ npx prisma generate
 ```
 
  Run Migrations:
 
 Development (Prototyping):
  ```
-        npx prisma db push
+  npx prisma db push
 ```
 
  Production (Versioning):
 ```
-        npx prisma migrate dev --name init
+npx prisma migrate dev --name init
 ```
  Running the Server
 
 Development Mode (with auto-restart via Nodemon):
 ```
-        npm run dev
+ npm run dev
 ```
 
 Production Mode:
 ```
-        npm start
+npm start
 ```
 The server will start on http://localhost:5001.
 

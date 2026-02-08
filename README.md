@@ -122,33 +122,32 @@ EMAIL_PASS="your-email-app-password"
 
 We use Prisma to manage the database schema.
 
-    Generate the Prisma Client:
-    Bash
+Generate the Prisma Client:
+```
+        npx prisma generate
+```
 
-    npx prisma generate
+ Run Migrations:
 
-    Run Migrations:
-
-        Development (Prototyping):
-        Bash
-
+Development (Prototyping):
+ ```
         npx prisma db push
+```
 
-        Production (Versioning):
-        Bash
-
+ Production (Versioning):
+```
         npx prisma migrate dev --name init
+```
  Running the Server
 
 Development Mode (with auto-restart via Nodemon):
 ```
-npm run dev
+        npm run dev
 ```
 
 Production Mode:
 ```
-
-npm start
+        npm start
 ```
 The server will start on http://localhost:5001.
 

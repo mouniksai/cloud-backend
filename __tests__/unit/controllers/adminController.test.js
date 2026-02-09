@@ -173,3 +173,184 @@ describe('AdminController', () => {
                 electionId: 1
             });
         });
+
+        it('should create audit log for election creation', async () => {
+            req.body = {
+                title: 'Test Election',
+                description: 'Desc',
+                constituency: 'District-2',
+                startTime: new Date(),
+                endTime: new Date()
+            };
+
+            prisma.election.create.mockResolvedValue({ id: 5 });
+            prisma.auditLog.create.mockResolvedValue({});
+
+            await adminController.createElection(req, res);
+
+            expect(prisma.auditLog.create).toHaveBeenCalledWith({
+                data: {
+                    userId: 1,
+                    action: "CREATED_ELECTION",
+                    details: "Created: Test Election (District-2)",
+                    ipAddress: '127.0.0.1'
+                }
+            });
+        });
+
+        it('should handle errors during election creation', async () => {
+            req.body = {
+                title: 'Election',
+                description: 'Desc',
+                constituency: 'District-1',
+                startTime: new Date(),
+                endTime: new Date()
+            };
+
+            prisma.election.create.mockRejectedValue(new Error('Creation failed'));
+
+            await adminController.createElection(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({
+                message: "Server Error"
+            });
+        });
+    });
+
+    describe('addCandidate', () => {
+        it('should add candidate to election successfully', async () => {
+            const newCandidate = {
+                id: 1,
+                electionId: 1,
+                name: 'John Doe',
+                party: 'Party X',
+                symbol: 'X',
+                age: 45,
+                education: 'MBA',
+                experience: '10 years'
+            };
+
+            req.body = {
+                electionId: 1,
+                name: 'John Doe',
+                party: 'Party X',
+                symbol: 'X',
+                keyPoints: ['Point 1', 'Point 2'],
+                age: '45',
+                education: 'MBA',
+                experience: '10 years'
+            };
+
+            prisma.candidate.create.mockResolvedValue(newCandidate);
+            prisma.auditLog.create.mockResolvedValue({});
+
+            await adminController.addCandidate(req, res);
+
+            expect(prisma.candidate.create).toHaveBeenCalledWith({
+                data: {
+                    electionId: 1,
+                    name: 'John Doe',
+                    party: 'Party X',
+                    symbol: 'X',
+                    age: 45,
+                    education: 'MBA',
+                    experience: '10 years',
+                    keyPoints: ['Point 1', 'Point 2']
+                }
+            });
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json).toHaveBeenCalledWith({
+                message: "Candidate Added",
+                candidate: newCandidate
+            });
+        });
+
+        it('should create audit log for candidate addition', async () => {
+            req.body = {
+                electionId: 1,
+                name: 'Jane Smith',
+                party: 'Party Y',
+                symbol: 'Y',
+                keyPoints: [],
+                age: '40',
+                education: 'PhD',
+                experience: '15 years'
+            };
+
+            prisma.candidate.create.mockResolvedValue({ id: 2 });
+            prisma.auditLog.create.mockResolvedValue({});
+
+            await adminController.addCandidate(req, res);
+
+            expect(prisma.auditLog.create).toHaveBeenCalledWith({
+                data: {
+                    userId: 1,
+                    action: "ADDED_CANDIDATE",
+                    details: "Added Jane Smith to election 1",
+                    ipAddress: '127.0.0.1'
+                }
+            });
+        });
+
+        it('should handle errors during candidate addition', async () => {
+            req.body = {
+                electionId: 1,
+                name: 'Test',
+                party: 'Party',
+                symbol: 'S',
+                keyPoints: [],
+                age: '30',
+                education: 'BSc',
+                experience: '5 years'
+            };
+
+            prisma.candidate.create.mockRejectedValue(new Error('Add failed'));
+
+            await adminController.addCandidate(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({
+                message: "Server Error"
+            });
+        });
+    });
+
+    describe('getElections', () => {
+        it('should return all elections with basic info', async () => {
+            const mockElections = [
+                { id: 1, title: 'Election 1', status: 'LIVE' },
+                { id: 2, title: 'Election 2', status: 'ENDED' },
+                { id: 3, title: 'Election 3', status: 'UPCOMING' }
+            ];
+
+            prisma.election.findMany.mockResolvedValue(mockElections);
+
+            await adminController.getElections(req, res);
+
+            expect(prisma.election.findMany).toHaveBeenCalledWith({
+                select: { id: true, title: true, status: true }
+            });
+            expect(res.json).toHaveBeenCalledWith(mockElections);
+        });
+
+        it('should handle empty election list', async () => {
+            prisma.election.findMany.mockResolvedValue([]);
+
+            await adminController.getElections(req, res);
+
+            expect(res.json).toHaveBeenCalledWith([]);
+        });
+
+        it('should handle errors', async () => {
+            prisma.election.findMany.mockRejectedValue(new Error('Fetch failed'));
+
+            await adminController.getElections(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({
+                message: "Error fetching elections"
+            });
+        });
+    });
+});

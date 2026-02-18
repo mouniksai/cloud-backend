@@ -14,4 +14,7 @@ router.post('/verify-receipt', authMiddleware, voteController.verifyEncodedRecei
 // Route: POST /api/vote/verify-signature (Digital Signature Verification)
 router.post('/verify-signature', voteController.verifyDigitalSignature);
 
+// Route: GET /api/vote/decrypt/:voteId (Decryption demonstration)
+router.get('/decrypt/:voteId', authMiddleware, voteController.decryptVoteDetails);
+
 module.exports = router;

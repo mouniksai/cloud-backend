@@ -6,10 +6,21 @@ const keyExchangeService = require('./src/utils/keyExchangeService');
 const app = express();
 require('dotenv').config();
 
-// Middleware
+// Middleware  
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:7860',
+    process.env.CORS_ORIGIN,       // e.g. https://your-space.hf.space
+].filter(Boolean);
+
 app.use(cors({
-    origin: 'http://localhost:3000', // Your Next.js frontend URL
-    credentials: true // Enable credentials (cookies)
+    origin: function (origin, callback) {
+        // Allow requests with no origin (server-to-server, same container)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser()); // Add cookie parser middleware
@@ -22,6 +33,7 @@ app.use('/api/vote', require('./src/routes/voteRoutes'));
 app.use('/api/elections', require('./src/routes/electionRoutes'));
 app.use('/api/verification', require('./src/routes/verificationRoutes'));
 app.use('/api/keys', require('./src/routes/keyRoutes'));
+app.use('/api/blockchain', require('./src/routes/blockchainRoutes'));
 
 
 const PORT = process.env.PORT || 5001;

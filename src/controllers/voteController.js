@@ -3,51 +3,14 @@ const prisma = require('../config/db');
 const { generateReceiptHash } = require('../utils/cryptoUtils');
 const encryptionService = require('../utils/encryptionService');
 const EncodingService = require('../utils/encodingService');
+const blockchainService = require('../blockchain/blockchainService');
 
-// Helper function to update election statuses based on current time
-const updateElectionStatuses = async () => {
-    const now = new Date();
-
-    try {
-        // Update elections to LIVE if startTime has passed and status is UPCOMING
-        await prisma.election.updateMany({
-            where: {
-                startTime: {
-                    lte: now
-                },
-                status: 'UPCOMING'
-            },
-            data: {
-                status: 'LIVE'
-            }
-        });
-
-        // Update elections to ENDED if endTime has passed and status is LIVE
-        await prisma.election.updateMany({
-            where: {
-                endTime: {
-                    lte: now
-                },
-                status: 'LIVE'
-            },
-            data: {
-                status: 'ENDED'
-            }
-        });
-    } catch (error) {
-        console.error('Error updating election statuses:', error);
-    }
-};
-
-// --- 1. GET BALLOT (Fetch Candidates) ---
+// --- 1. GET BALLOT (Fetch Candidates from Blockchain) ---
 exports.getBallot = async (req, res) => {
     try {
         const userId = req.user.user_id;
 
-        // First, update election statuses based on current time
-        await updateElectionStatuses();
-
-        // A. Get User's Constituency
+        // A. Get User's Constituency (still from PostgreSQL)
         const user = await prisma.user.findUnique({
             where: { userId },
             include: { citizen: true }
@@ -55,44 +18,36 @@ exports.getBallot = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        // B. Find LIVE Election for this constituency that hasn't ended
+        // B. Find LIVE Election for this constituency from Blockchain
         const now = new Date();
-        const election = await prisma.election.findFirst({
-            where: {
-                constituency: user.citizen.constituency,
-                status: "LIVE",
-                endTime: {
-                    gt: now // Election end time is in the future
-                }
-            },
-            include: {
-                candidates: {
-                    select: { id: true, name: true, party: true, symbol: true, keyPoints: true }
-                }
-            }
+        const elections = blockchainService.getElections({
+            constituency: user.citizen.constituency,
+            status: 'LIVE'
         });
+
+        // Find one that hasn't ended
+        const election = elections.find(e => new Date(e.endTime) > now);
 
         if (!election) {
             return res.status(404).json({ message: "No live election found for your constituency." });
         }
 
-        // C. Check if User already voted
-        const existingVote = await prisma.vote.findUnique({
-            where: {
-                userId_electionId: { userId, electionId: election.id }
-            }
-        });
+        // C. Check if User already voted (from Blockchain)
+        const existingVote = blockchainService.hasUserVoted(userId, election.id);
 
         if (existingVote) {
             return res.status(403).json({
                 message: "You have already cast your vote.",
                 hasVoted: true,
-                receiptHash: existingVote.receiptHash,
-                timestamp: existingVote.timestamp
+                receiptHash: existingVote.data.receiptHash,
+                timestamp: existingVote.data.timestamp
             });
         }
 
-        // D. Return Ballot
+        // D. Get candidates from Blockchain
+        const candidates = blockchainService.getCandidates(election.id);
+
+        // E. Return Ballot
         res.json({
             election: {
                 id: election.id,
@@ -100,7 +55,13 @@ exports.getBallot = async (req, res) => {
                 constituency: election.constituency,
                 endsAt: election.endTime
             },
-            candidates: election.candidates,
+            candidates: candidates.map(c => ({
+                id: c.id,
+                name: c.name,
+                party: c.party,
+                symbol: c.symbol,
+                keyPoints: c.keyPoints
+            })),
             hasVoted: false
         });
 
@@ -110,33 +71,41 @@ exports.getBallot = async (req, res) => {
     }
 };
 
-// --- 2. CAST VOTE (Atomic Transaction) ---
+// --- 2. CAST VOTE (Record on Blockchain) ---
 exports.castVote = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const { electionId, candidateId } = req.body;
 
-        // First, update election statuses
-        await updateElectionStatuses();
-
-        // Check if election is still active and hasn't ended
-        const election = await prisma.election.findUnique({
-            where: { id: electionId }
-        });
+        // Check if election exists and is still active (from Blockchain)
+        const election = blockchainService.getElection(electionId);
 
         if (!election) {
             return res.status(404).json({ message: "Election not found." });
         }
 
         const now = new Date();
-        if (election.status !== 'LIVE' || election.endTime <= now) {
+        if (election.status !== 'LIVE' || new Date(election.endTime) <= now) {
             return res.status(400).json({ message: "Election has ended or is not active." });
         }
 
-        // A. Generate Receipt Hash (Integrity)
+        // A. Double-Vote Check (from Blockchain)
+        const alreadyVoted = blockchainService.hasUserVoted(userId, electionId);
+        if (alreadyVoted) {
+            return res.status(409).json({ message: "You have already voted in this election." });
+        }
+
+        // B. Verify candidate exists in this election
+        const candidates = blockchainService.getCandidates(electionId);
+        const candidate = candidates.find(c => c.id === candidateId);
+        if (!candidate) {
+            return res.status(404).json({ message: "Candidate not found in this election." });
+        }
+
+        // C. Generate Receipt Hash (Integrity)
         const receiptHash = generateReceiptHash(userId, electionId, candidateId);
 
-        // A.1. Encrypt Vote Details (For Lab Evaluation)
+        // D. Encrypt Vote Details
         const voteDetails = {
             candidateId: candidateId,
             timestamp: new Date().toISOString(),
@@ -144,63 +113,48 @@ exports.castVote = async (req, res) => {
         };
         const encryptedDetails = encryptionService.encryptVote(voteDetails);
 
-        // B. ATOMIC TRANSACTION
-        // Prisma ensures all these 4 steps succeed or fail together.
-        const result = await prisma.$transaction(async (tx) => {
-
-            // 1. Double-Vote Check (Locking)
-            const alreadyVoted = await tx.vote.findUnique({
-                where: { userId_electionId: { userId, electionId } }
-            });
-            if (alreadyVoted) throw new Error("DOUBLE_VOTE_ATTEMPT");
-
-            // 2. Record the Vote (with encryption)
-            const newVote = await tx.vote.create({
-                data: {
-                    userId,
-                    electionId,
-                    candidateId,
-                    receiptHash,
-                    encryptedDetails
-                }
-            });
-
-            // 3. Update Candidate Tally (Real-time Analytics)
-            await tx.candidate.update({
-                where: { id: candidateId },
-                data: { voteCount: { increment: 1 } }
-            });
-
-            // 4. Create Audit Log (Non-Repudiation)
-            await tx.auditLog.create({
-                data: {
-                    userId,
-                    action: "CAST_VOTE",
-                    details: `Voted in election ${electionId} | Receipt: ${receiptHash}`,
-                    ipAddress: req.ip
-                }
-            });
-
-            return newVote;
+        // E. Record Vote on Blockchain (mined with Proof of Work)
+        const { block, vote } = blockchainService.castVote({
+            userId,
+            electionId,
+            candidateId,
+            receiptHash,
+            encryptedDetails
         });
 
-        // ENCODING IMPLEMENTATION - Generate encoded receipt formats
+        // F. Create Audit Log on Blockchain
+        blockchainService.addAudit({
+            userId,
+            action: "CAST_VOTE",
+            details: `Voted in election ${electionId} | Receipt: ${receiptHash} | Block: ${block.index}`,
+            ipAddress: req.ip
+        });
+
+        // G. ENCODING IMPLEMENTATION - Generate encoded receipt formats
         const receiptData = {
-            receiptHash: result.receiptHash,
-            timestamp: result.timestamp,
+            receiptHash: receiptHash,
+            timestamp: vote.timestamp,
             electionId: electionId
         };
 
         const encodedReceipt = EncodingService.encodeReceiptToBase64(receiptData);
-        const qrCode = await EncodingService.generateReceiptQRCode(result.receiptHash);
-        const barcodeNumber = EncodingService.encodeToBarcode(result.receiptHash);
+        const qrCode = await EncodingService.generateReceiptQRCode(receiptHash);
+        const barcodeNumber = EncodingService.encodeToBarcode(receiptHash);
 
-        // C. Success Response with encoded formats
+        // H. Success Response with blockchain info
         res.json({
             success: true,
-            message: "Vote cast successfully",
-            receiptHash: result.receiptHash,
-            timestamp: result.timestamp,
+            message: "Vote cast successfully and recorded on blockchain",
+            receiptHash: receiptHash,
+            timestamp: vote.timestamp,
+            // Blockchain proof
+            blockchain: {
+                blockIndex: block.index,
+                blockHash: block.hash,
+                merkleRoot: block.merkleRoot,
+                previousHash: block.previousHash,
+                nonce: block.nonce
+            },
             // Encoded formats for lab evaluation
             encodedFormats: {
                 base64: encodedReceipt,
@@ -211,9 +165,6 @@ exports.castVote = async (req, res) => {
 
     } catch (err) {
         console.error("Voting Error:", err);
-        if (err.message === "DOUBLE_VOTE_ATTEMPT" || err.code === 'P2002') {
-            return res.status(409).json({ message: "You have already voted in this election." });
-        }
         res.status(500).json({ message: "Vote Casting Failed." });
     }
 };
@@ -223,20 +174,45 @@ exports.decryptVoteDetails = async (req, res) => {
     try {
         const { voteId } = req.params;
 
-        const vote = await prisma.vote.findUnique({
-            where: { id: voteId },
-            include: { candidate: true, election: true }
-        });
+        // Search blockchain for this vote
+        const votes = blockchainService.getBlockchainInstance
+            ? require('../blockchain/blockchainService').getFullChain()
+            : [];
 
-        if (!vote) {
+        // Search all blocks for the vote
+        const allVotes = blockchainService.searchTransactions
+            ? blockchainService.getBlockchainInstance().searchTransactions({ type: 'VOTE', id: voteId })
+            : [];
+
+        // Fallback: search by ID through blockchain service
+        const chain = blockchainService.getFullChain();
+        let foundVote = null;
+        let foundCandidate = null;
+        let foundElection = null;
+
+        for (const block of chain) {
+            for (const tx of block.transactions) {
+                if (tx.type === 'VOTE' && tx.data.id === voteId) {
+                    foundVote = tx.data;
+                }
+                if (tx.type === 'CANDIDATE' && foundVote && tx.data.id === foundVote.candidateId) {
+                    foundCandidate = tx.data;
+                }
+                if (tx.type === 'ELECTION' && foundVote && tx.data.id === foundVote.electionId) {
+                    foundElection = tx.data;
+                }
+            }
+        }
+
+        if (!foundVote) {
             return res.status(404).json({ message: "Vote not found" });
         }
 
         // Demonstrate decryption
         let decryptedDetails = null;
-        if (vote.encryptedDetails) {
+        if (foundVote.encryptedDetails) {
             try {
-                decryptedDetails = encryptionService.decryptVote(vote.encryptedDetails);
+                decryptedDetails = encryptionService.decryptVote(foundVote.encryptedDetails);
             } catch (error) {
                 console.log('Decryption failed:', error.message);
                 decryptedDetails = { error: 'Decryption failed' };
@@ -244,12 +220,12 @@ exports.decryptVoteDetails = async (req, res) => {
         }
 
         res.json({
-            voteId: vote.id,
-            candidate: vote.candidate.name,
-            election: vote.election.title,
-            encryptedDetails: vote.encryptedDetails,
+            voteId: foundVote.id,
+            candidate: foundCandidate ? foundCandidate.name : 'Unknown',
+            election: foundElection ? foundElection.title : 'Unknown',
+            encryptedDetails: foundVote.encryptedDetails,
             decryptedDetails: decryptedDetails,
-            receiptHash: vote.receiptHash
+            receiptHash: foundVote.receiptHash
         });
 
     } catch (error) {
@@ -276,33 +252,32 @@ exports.verifyEncodedReceipt = async (req, res) => {
                 return res.status(400).json({ message: "Invalid format. Use 'base64' or 'url-safe'" });
         }
 
-        // Verify the receipt exists in database
-        const vote = await prisma.vote.findFirst({
-            where: {
-                receiptHash: decodedData.receiptHash,
-                timestamp: new Date(decodedData.timestamp)
-            },
-            include: {
-                election: { select: { title: true, constituency: true } }
-            }
-        });
+        // Verify the receipt exists in blockchain
+        const verification = blockchainService.verifyVote(decodedData.receiptHash);
 
-        if (!vote) {
+        if (!verification) {
             return res.status(404).json({
-                message: "Receipt not found or invalid",
+                message: "Receipt not found on blockchain",
                 decodedData
             });
         }
 
+        // Get election info from blockchain
+        const election = blockchainService.getElection(verification.vote.electionId);
+
         res.json({
             success: true,
-            message: "Receipt verified successfully",
+            message: "Receipt verified successfully on blockchain",
             decodedData,
             verification: {
-                electionTitle: vote.election.title,
-                constituency: vote.election.constituency,
-                votedAt: vote.timestamp,
-                verified: true
+                electionTitle: election ? election.title : 'Unknown',
+                constituency: election ? election.constituency : 'Unknown',
+                votedAt: verification.vote.timestamp,
+                verified: true,
+                blockIndex: verification.blockIndex,
+                blockHash: verification.blockHash,
+                merkleValid: verification.merkleValid,
+                chainValid: verification.chainValid
             }
         });
 
@@ -315,7 +290,7 @@ exports.verifyEncodedReceipt = async (req, res) => {
     }
 };
 
-// --- DIGITAL SIGNATURE VERIFICATION (Demonstrate Data Integrity & Authenticity) ---
+// --- DIGITAL SIGNATURE VERIFICATION ---
 exports.verifyDigitalSignature = async (req, res) => {
     try {
         const { receiptHash, userId, electionId, candidateId } = req.body;
@@ -328,68 +303,75 @@ exports.verifyDigitalSignature = async (req, res) => {
             });
         }
 
-        // 2. Look up the vote in database by receipt hash
-        const vote = await prisma.vote.findFirst({
-            where: { receiptHash: receiptHash },
-            include: {
-                election: { select: { id: true, title: true, constituency: true } },
-                candidate: { select: { id: true, name: true, party: true } },
-                user: { select: { userId: true } }
-            }
-        });
+        // 2. Look up the vote on the blockchain
+        const verification = blockchainService.verifyVote(receiptHash);
 
         // 3. Check if vote exists
-        if (!vote) {
+        if (!verification) {
             return res.json({
                 verified: false,
-                message: "❌ Receipt not found in database - Vote does not exist or was not recorded",
+                message: "❌ Receipt not found on blockchain - Vote does not exist or was not recorded",
                 details: {
                     providedHash: receiptHash,
-                    existsInDatabase: false,
+                    existsOnBlockchain: false,
                     dataMatch: false,
                     voteInfo: null
                 }
             });
         }
 
-        // 4. If userId, electionId, candidateId provided, verify they match the stored vote
+        const vote = verification.vote;
+
+        // 4. If userId, electionId, candidateId provided, verify they match
         let dataMatch = true;
         let mismatchDetails = [];
 
         if (userId && vote.userId !== userId) {
             dataMatch = false;
-            mismatchDetails.push(`User ID mismatch (expected: ${vote.userId}, provided: ${userId})`);
+            mismatchDetails.push(`User ID mismatch`);
         }
-        if (electionId && vote.election.id !== electionId) {
+        if (electionId && vote.electionId !== electionId) {
             dataMatch = false;
-            mismatchDetails.push(`Election ID mismatch (expected: ${vote.election.id}, provided: ${electionId})`);
+            mismatchDetails.push(`Election ID mismatch`);
         }
-        if (candidateId && vote.candidate.id !== candidateId) {
+        if (candidateId && vote.candidateId !== candidateId) {
             dataMatch = false;
-            mismatchDetails.push(`Candidate ID mismatch (expected: ${vote.candidate.id}, provided: ${candidateId})`);
+            mismatchDetails.push(`Candidate ID mismatch`);
         }
+
+        // Get candidate and election info from blockchain
+        const candidates = blockchainService.getCandidates(vote.electionId);
+        const candidateInfo = candidates.find(c => c.id === vote.candidateId);
+        const election = blockchainService.getElection(vote.electionId);
 
         // 5. Return comprehensive verification result
         res.json({
             verified: dataMatch,
             message: dataMatch
-                ? "✅ Digital signature verified - Receipt is authentic and data integrity confirmed"
+                ? "✅ Digital signature verified on blockchain - Receipt is authentic and data integrity confirmed"
                 : `❌ Data mismatch detected - ${mismatchDetails.join(', ')}`,
             details: {
                 providedHash: receiptHash,
-                existsInDatabase: true,
+                existsOnBlockchain: true,
                 dataMatch: dataMatch,
                 mismatchDetails: mismatchDetails.length > 0 ? mismatchDetails : null,
+                blockchainProof: {
+                    blockIndex: verification.blockIndex,
+                    blockHash: verification.blockHash,
+                    merkleRoot: verification.merkleRoot,
+                    merkleValid: verification.merkleValid,
+                    chainValid: verification.chainValid
+                },
                 storedData: {
                     userId: vote.userId,
-                    electionId: vote.election.id,
-                    candidateId: vote.candidate.id
+                    electionId: vote.electionId,
+                    candidateId: vote.candidateId
                 },
                 voteInfo: {
-                    election: vote.election.title,
-                    constituency: vote.election.constituency,
-                    candidate: vote.candidate.name,
-                    party: vote.candidate.party,
+                    election: election ? election.title : 'Unknown',
+                    constituency: election ? election.constituency : 'Unknown',
+                    candidate: candidateInfo ? candidateInfo.name : 'Unknown',
+                    party: candidateInfo ? candidateInfo.party : 'Unknown',
                     votedAt: vote.timestamp
                 }
             }

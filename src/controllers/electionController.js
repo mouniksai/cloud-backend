@@ -1,5 +1,6 @@
 // src/controllers/electionController.js
 const prisma = require('../config/db');
+const blockchainService = require('../blockchain/blockchainService');
 
 // Helper function to calculate time remaining
 const calculateTimeRemaining = (endTime) => {
@@ -7,7 +8,7 @@ const calculateTimeRemaining = (endTime) => {
     const end = new Date(endTime);
     const diff = end.getTime() - now.getTime();
 
-    if (diff <= 0) return null; // Election has ended
+    if (diff <= 0) return null;
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -15,52 +16,12 @@ const calculateTimeRemaining = (endTime) => {
     return `${hours.toString().padStart(2, '0')}h : ${minutes.toString().padStart(2, '0')}m`;
 };
 
-// Helper function to update election statuses based on current time
-const updateElectionStatuses = async () => {
-    const now = new Date();
-
-    try {
-        // Update elections to LIVE if startTime has passed and status is UPCOMING
-        await prisma.election.updateMany({
-            where: {
-                startTime: {
-                    lte: now
-                },
-                status: 'UPCOMING'
-            },
-            data: {
-                status: 'LIVE'
-            }
-        });
-
-        // Update elections to ENDED if endTime has passed and status is LIVE
-        await prisma.election.updateMany({
-            where: {
-                endTime: {
-                    lte: now
-                },
-                status: 'LIVE'
-            },
-            data: {
-                status: 'ENDED'
-            }
-        });
-
-        console.log('Election statuses updated based on current time');
-    } catch (error) {
-        console.error('Error updating election statuses:', error);
-    }
-};
-
-// GET /api/elections/results - Get all election results and history
+// GET /api/elections/results - Get all election results from Blockchain
 exports.getElectionResults = async (req, res) => {
     try {
         const userId = req.user.user_id;
 
-        // First, update election statuses based on current time
-        await updateElectionStatuses();
-
-        // Get user details to filter by constituency
+        // Get user details from PostgreSQL (for constituency)
         const user = await prisma.user.findUnique({
             where: { userId },
             include: { citizen: true }
@@ -68,59 +29,63 @@ exports.getElectionResults = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        // Fetch all elections for the user's constituency with candidates and vote counts
-        const elections = await prisma.election.findMany({
-            where: {
-                constituency: user.citizen.constituency
-            },
-            include: {
-                candidates: {
-                    orderBy: {
-                        voteCount: 'desc'
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        party: true,
-                        symbol: true,
-                        keyPoints: true,
-                        voteCount: true,
-                        age: true,
-                        education: true,
-                        experience: true
-                    }
-                },
-                votes: {
-                    select: {
-                        id: true,
-                        timestamp: true
-                    }
-                }
-            },
-            orderBy: {
-                endTime: 'desc' // Most recent elections first
-            }
+        // Fetch all elections for the user's constituency from Blockchain
+        const elections = blockchainService.getElections({
+            constituency: user.citizen.constituency
         });
 
-        // Add calculated fields to each election
-        const electionsWithDetails = elections.map(election => ({
-            ...election,
-            totalVotes: election.candidates.reduce((sum, candidate) => sum + candidate.voteCount, 0),
-            timeRemaining: election.status === 'LIVE' ? calculateTimeRemaining(election.endTime) : null,
-            winner: election.status === 'ENDED'
-                ? election.candidates.reduce((winner, candidate) =>
-                    candidate.voteCount > (winner?.voteCount || 0) ? candidate : winner
-                    , null)
-                : null
-        }));
+        // Sort by endTime descending
+        elections.sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
 
-        // Log dashboard access
-        await prisma.auditLog.create({
-            data: {
-                userId: userId,
-                action: "VIEWED_ELECTION_RESULTS",
-                ipAddress: req.ip
-            }
+        // Enrich each election with candidates and vote counts from Blockchain
+        const electionsWithDetails = elections.map(election => {
+            const candidates = blockchainService.getCandidates(election.id);
+            const electionVotes = blockchainService.getElectionVotes(election.id);
+
+            // Sort candidates by voteCount descending
+            candidates.sort((a, b) => b.voteCount - a.voteCount);
+
+            const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
+
+            return {
+                id: election.id,
+                title: election.title,
+                description: election.description,
+                constituency: election.constituency,
+                startTime: election.startTime,
+                endTime: election.endTime,
+                status: election.status,
+                candidates: candidates.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    party: c.party,
+                    symbol: c.symbol,
+                    keyPoints: c.keyPoints,
+                    voteCount: c.voteCount,
+                    age: c.age,
+                    education: c.education,
+                    experience: c.experience
+                })),
+                votes: electionVotes.map(v => ({
+                    id: v.data.id,
+                    timestamp: v.data.timestamp
+                })),
+                totalVotes,
+                timeRemaining: election.status === 'LIVE' ? calculateTimeRemaining(election.endTime) : null,
+                winner: election.status === 'ENDED' && candidates.length > 0
+                    ? candidates.reduce((winner, c) =>
+                        c.voteCount > (winner?.voteCount || 0) ? c : winner, null)
+                    : null,
+                blockIndex: election.blockIndex,
+                blockHash: election.blockHash
+            };
+        });
+
+        // Audit log on blockchain
+        blockchainService.addAudit({
+            userId: userId,
+            action: "VIEWED_ELECTION_RESULTS",
+            ipAddress: req.ip
         });
 
         res.json({
@@ -143,84 +108,63 @@ exports.getElectionResults = async (req, res) => {
 exports.getElectionDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.user_id;
 
-        // Update statuses first
-        await updateElectionStatuses();
-
-        const election = await prisma.election.findUnique({
-            where: { id },
-            include: {
-                candidates: {
-                    orderBy: {
-                        voteCount: 'desc'
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        party: true,
-                        symbol: true,
-                        keyPoints: true,
-                        voteCount: true,
-                        age: true,
-                        education: true,
-                        experience: true
-                    }
-                },
-                votes: {
-                    include: {
-                        user: {
-                            include: {
-                                citizen: {
-                                    select: {
-                                        constituency: true,
-                                        ward: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        // Get election from Blockchain
+        const election = blockchainService.getElection(id);
 
         if (!election) {
             return res.status(404).json({ message: "Election not found" });
         }
 
-        // Calculate additional analytics
-        const totalVotes = election.candidates.reduce((sum, candidate) => sum + candidate.voteCount, 0);
-        const winner = election.status === 'ENDED'
-            ? election.candidates.reduce((winner, candidate) =>
-                candidate.voteCount > (winner?.voteCount || 0) ? candidate : winner
-                , null)
+        // Get candidates and votes from Blockchain
+        const candidates = blockchainService.getCandidates(id);
+        candidates.sort((a, b) => b.voteCount - a.voteCount);
+
+        const votes = blockchainService.getElectionVotes(id);
+        const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
+
+        const winner = election.status === 'ENDED' && candidates.length > 0
+            ? candidates.reduce((w, c) => c.voteCount > (w?.voteCount || 0) ? c : w, null)
             : null;
 
         // Vote timeline (anonymized)
-        const voteTimeline = election.votes
-            .map(vote => ({
-                timestamp: vote.timestamp,
-                ward: vote.user.citizen.ward
+        const voteTimeline = votes
+            .map(v => ({
+                timestamp: v.data.timestamp,
+                blockIndex: v.blockIndex
             }))
             .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        // Ward-wise breakdown
-        const wardBreakdown = election.votes.reduce((acc, vote) => {
-            const ward = vote.user.citizen.ward;
-            acc[ward] = (acc[ward] || 0) + 1;
-            return acc;
-        }, {});
-
         const response = {
-            ...election,
+            id: election.id,
+            title: election.title,
+            description: election.description,
+            constituency: election.constituency,
+            startTime: election.startTime,
+            endTime: election.endTime,
+            status: election.status,
+            candidates: candidates.map(c => ({
+                id: c.id,
+                name: c.name,
+                party: c.party,
+                symbol: c.symbol,
+                keyPoints: c.keyPoints,
+                voteCount: c.voteCount,
+                age: c.age,
+                education: c.education,
+                experience: c.experience
+            })),
             totalVotes,
             winner,
             timeRemaining: election.status === 'LIVE' ? calculateTimeRemaining(election.endTime) : null,
             analytics: {
                 voteTimeline,
-                wardBreakdown,
-                turnoutPercentage: 85.2, // This would be calculated based on registered voters
-                peakVotingHour: '14:00' // This would be calculated from vote timestamps
+                turnoutPercentage: 85.2,
+                peakVotingHour: '14:00'
+            },
+            blockchainProof: {
+                blockIndex: election.blockIndex,
+                blockHash: election.blockHash
             }
         };
 
@@ -232,15 +176,9 @@ exports.getElectionDetails = async (req, res) => {
     }
 };
 
-// Background service to automatically update election statuses
+// Background service to log election status updates
 exports.startElectionStatusUpdater = () => {
-    // Run immediately
-    updateElectionStatuses();
-
-    // Then run every 5 minutes
-    setInterval(() => {
-        updateElectionStatuses();
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
-
-    console.log('Election status updater started - checking every 5 minutes');
+    console.log('📊 Election status updater started (blockchain-based) - statuses computed on read');
+    // No longer needed to write status updates to DB
+    // Statuses are now computed dynamically from blockchain based on startTime/endTime
 };

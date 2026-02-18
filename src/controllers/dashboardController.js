@@ -1,5 +1,6 @@
 // src/controllers/dashboardController.js
 const prisma = require('../config/db');
+const blockchainService = require('../blockchain/blockchainService');
 
 // Helper function to calculate time remaining
 const calculateTimeRemaining = (endTime) => {
@@ -7,7 +8,7 @@ const calculateTimeRemaining = (endTime) => {
     const end = new Date(endTime);
     const diff = end.getTime() - now.getTime();
 
-    if (diff <= 0) return null; // Election has ended
+    if (diff <= 0) return null;
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -15,49 +16,11 @@ const calculateTimeRemaining = (endTime) => {
     return `${hours.toString().padStart(2, '0')}h : ${minutes.toString().padStart(2, '0')}m`;
 };
 
-// Helper function to update election statuses based on current time
-const updateElectionStatuses = async () => {
-    const now = new Date();
-
-    try {
-        // Update elections to LIVE if startTime has passed and status is UPCOMING
-        await prisma.election.updateMany({
-            where: {
-                startTime: {
-                    lte: now
-                },
-                status: 'UPCOMING'
-            },
-            data: {
-                status: 'LIVE'
-            }
-        });
-
-        // Update elections to ENDED if endTime has passed and status is LIVE
-        await prisma.election.updateMany({
-            where: {
-                endTime: {
-                    lte: now
-                },
-                status: 'LIVE'
-            },
-            data: {
-                status: 'ENDED'
-            }
-        });
-    } catch (error) {
-        console.error('Error updating election statuses:', error);
-    }
-};
-
 exports.getDashboardData = async (req, res) => {
     try {
         const userId = req.user.user_id;
 
-        // First, update election statuses based on current time
-        await updateElectionStatuses();
-
-        // 1. Fetch User & Citizen Details
+        // 1. Fetch User & Citizen Details (still from PostgreSQL)
         const user = await prisma.user.findUnique({
             where: { userId },
             include: { citizen: true }
@@ -65,50 +28,53 @@ exports.getDashboardData = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        // 2. Fetch Active Elections for THIS User's Constituency
-        // Only show LIVE elections where user hasn't voted and election hasn't ended
-        const activeElection = await prisma.election.findFirst({
-            where: {
-                constituency: user.citizen.constituency,
-                status: "LIVE",
-                endTime: {
-                    gt: new Date() // Election end time is in the future
-                },
-                // Exclude elections where user has already voted
-                NOT: {
-                    votes: {
-                        some: {
-                            userId: userId
-                        }
-                    }
+        // 2. Fetch Active Elections from Blockchain
+        const now = new Date();
+        const liveElections = blockchainService.getElections({
+            constituency: user.citizen.constituency,
+            status: 'LIVE'
+        });
+
+        // Find an active election where user hasn't voted
+        let activeElection = null;
+        for (const election of liveElections) {
+            if (new Date(election.endTime) > now) {
+                const hasVoted = blockchainService.hasUserVoted(userId, election.id);
+                if (!hasVoted) {
+                    activeElection = election;
+                    break;
                 }
             }
+        }
+
+        // 3. Fetch User's Voting History from Blockchain
+        const userVotes = blockchainService.getUserVotes(userId);
+
+        const history = userVotes.map(vote => {
+            const election = blockchainService.getElection(vote.data.electionId);
+            const candidates = blockchainService.getCandidates(vote.data.electionId);
+            const candidate = candidates.find(c => c.id === vote.data.candidateId);
+
+            return {
+                id: vote.data.id,
+                election: election ? election.title : 'Unknown',
+                candidate: candidate ? candidate.name : 'Unknown',
+                date: new Date(vote.data.timestamp).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                }),
+                receiptHash: vote.data.receiptHash,
+                status: "Confirmed on Blockchain",
+                blockIndex: vote.blockIndex,
+                blockHash: vote.blockHash
+            };
         });
 
-        // 3. Fetch User's Actual Voting History
-        const userVotes = await prisma.vote.findMany({
-            where: { userId },
-            include: {
-                election: true,
-                candidate: true
-            },
-            orderBy: { timestamp: 'desc' }
-        });
+        // Sort history by timestamp desc
+        history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        const history = userVotes.map(vote => ({
-            id: vote.id,
-            election: vote.election.title,
-            candidate: vote.candidate.name,
-            date: vote.timestamp.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            }),
-            receiptHash: vote.receiptHash,
-            status: "Confirmed"
-        }));
-
-        // 4. Construct Response matching your Frontend Props
+        // 4. Construct Response
         const dashboardData = {
             userSession: {
                 name: user.citizen.fullName,
@@ -125,17 +91,16 @@ exports.getDashboardData = async (req, res) => {
                 endsIn: calculateTimeRemaining(activeElection.endTime) || "00h : 00m",
                 status: activeElection.status,
                 eligible: true
-            } : null, // If null, frontend should show "No Active Elections"
-            history: history
+            } : null,
+            history: history,
+            blockchain: blockchainService.getChainStatus()
         };
 
-        // 5. SECURITY: Log that user viewed dashboard
-        await prisma.auditLog.create({
-            data: {
-                userId: userId,
-                action: "VIEWED_DASHBOARD",
-                ipAddress: req.ip
-            }
+        // 5. SECURITY: Audit log on blockchain
+        blockchainService.addAudit({
+            userId: userId,
+            action: "VIEWED_DASHBOARD",
+            ipAddress: req.ip
         });
 
         res.json(dashboardData);

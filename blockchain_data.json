@@ -1,0 +1,364 @@
+{
+  "chain": [
+    {
+      "index": 0,
+      "timestamp": "2026-02-18T16:40:33.827Z",
+      "transactions": [
+        {
+          "type": "GENESIS",
+          "message": "VoteGuard Blockchain Genesis Block",
+          "timestamp": "2026-02-18T16:40:33.828Z"
+        }
+      ],
+      "previousHash": "0",
+      "merkleRoot": "63dac067999e53e062fed1df93cd0bb612e2ab4f4e90c409f506eeb93dd06847",
+      "nonce": 27219,
+      "hash": "0000118ced786c0c73e6bdd2bb37ff3f64a15981c13c0838de661325d28fa599"
+    },
+    {
+      "index": 1,
+      "timestamp": "2026-02-18T16:40:58.330Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "c176d884-4496-488d-be0b-049a6788e9a0",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:40:58.330Z"
+          },
+          "timestamp": "2026-02-18T16:40:58.330Z"
+        }
+      ],
+      "previousHash": "0000118ced786c0c73e6bdd2bb37ff3f64a15981c13c0838de661325d28fa599",
+      "merkleRoot": "bc801e0958cc66f237ce89a02c767ccd7c08b3e2bf73a1ed69428308aeb2f0eb",
+      "nonce": 119351,
+      "hash": "0000fe7b9cde1a31af663722e2421c1890dfcd04f212ddc150d26d1b2e880cd9"
+    },
+    {
+      "index": 2,
+      "timestamp": "2026-02-18T16:41:03.132Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "88a7d040-0676-4f58-bddb-c00f22614bb5",
+            "userId": "bc573a31-02a0-4358-becf-f84780949909",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-18T16:41:03.131Z"
+          },
+          "timestamp": "2026-02-18T16:41:03.132Z"
+        }
+      ],
+      "previousHash": "0000fe7b9cde1a31af663722e2421c1890dfcd04f212ddc150d26d1b2e880cd9",
+      "merkleRoot": "2d1c78baf4407d9500fbf03bad7cfd09fd51f73c8d2eb665dc35c6e25f515f96",
+      "nonce": 167806,
+      "hash": "0000022d6a75c5b569588c8891adaa1fa2d5a49e7c413e22bc25960d94152e3c"
+    },
+    {
+      "index": 3,
+      "timestamp": "2026-02-18T16:41:08.041Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "ee17ded2-5b6a-446d-a3ae-6573423f77dc",
+            "userId": "bc573a31-02a0-4358-becf-f84780949909",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-18T16:41:08.040Z"
+          },
+          "timestamp": "2026-02-18T16:41:08.040Z"
+        }
+      ],
+      "previousHash": "0000022d6a75c5b569588c8891adaa1fa2d5a49e7c413e22bc25960d94152e3c",
+      "merkleRoot": "996bf1be0d18e1639f289533a610b07b5afbc7c077f77d5282519c302b706672",
+      "nonce": 14107,
+      "hash": "000062adec8a1018531d198a1e85348d4a5ccbebe92b8c0ec1f859620e754669"
+    },
+    {
+      "index": 4,
+      "timestamp": "2026-02-18T16:41:51.067Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "954e41f4-c146-4737-ab49-721e8aef6d94",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:41:51.067Z"
+          },
+          "timestamp": "2026-02-18T16:41:51.067Z"
+        }
+      ],
+      "previousHash": "000062adec8a1018531d198a1e85348d4a5ccbebe92b8c0ec1f859620e754669",
+      "merkleRoot": "539bae2f79b2a5f33d43316b47e7a70fcd186521e07ad40f5e0d97b620422414",
+      "nonce": 12726,
+      "hash": "00003cf0933e0b79aebdf2ab0b638a35c83b10d68751794586fce172dd1498c9"
+    },
+    {
+      "index": 5,
+      "timestamp": "2026-02-18T16:41:58.661Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "e0479aba-2149-4f2a-bcf6-421c7d207c8b",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:41:58.661Z"
+          },
+          "timestamp": "2026-02-18T16:41:58.661Z"
+        }
+      ],
+      "previousHash": "00003cf0933e0b79aebdf2ab0b638a35c83b10d68751794586fce172dd1498c9",
+      "merkleRoot": "7cd1a55930fce16e2ad932e1db6bdbad9356cc2c292892357912ff9daef4a2af",
+      "nonce": 97122,
+      "hash": "0000bba92f081323571ed66b65066f43cfdc4b716d89eb3876488f1aadb1abaf"
+    },
+    {
+      "index": 6,
+      "timestamp": "2026-02-18T16:42:41.853Z",
+      "transactions": [
+        {
+          "type": "ELECTION",
+          "data": {
+            "id": "d3c3e050-166c-43ee-856e-c249b74cea67",
+            "title": "2026 Ele",
+            "description": "sfasdf",
+            "constituency": "General",
+            "startTime": "2026-02-18T16:42:00.000Z",
+            "endTime": "2026-02-18T17:00:00.000Z",
+            "status": "LIVE",
+            "createdAt": "2026-02-18T16:42:41.853Z"
+          },
+          "timestamp": "2026-02-18T16:42:41.853Z"
+        }
+      ],
+      "previousHash": "0000bba92f081323571ed66b65066f43cfdc4b716d89eb3876488f1aadb1abaf",
+      "merkleRoot": "47fdf4bffd2f2710f6b083e80bcef917adab3638679fae5a185b9c20c8cbee51",
+      "nonce": 118854,
+      "hash": "0000e4ffc5121965bebcc6c49cbc7c1e5dcbe74fc15207ee4f110bc60662eeb9"
+    },
+    {
+      "index": 7,
+      "timestamp": "2026-02-18T16:43:27.168Z",
+      "transactions": [
+        {
+          "type": "CANDIDATE",
+          "data": {
+            "id": "4181c347-b3e7-4c64-9f71-45ac8c2e20ee",
+            "name": "sanju",
+            "party": "asdasd",
+            "symbol": "🌳",
+            "age": 45,
+            "education": "",
+            "experience": "",
+            "keyPoints": [
+              "asfdasd"
+            ],
+            "electionId": "d3c3e050-166c-43ee-856e-c249b74cea67",
+            "createdAt": "2026-02-18T16:43:27.168Z"
+          },
+          "timestamp": "2026-02-18T16:43:27.168Z"
+        }
+      ],
+      "previousHash": "0000e4ffc5121965bebcc6c49cbc7c1e5dcbe74fc15207ee4f110bc60662eeb9",
+      "merkleRoot": "9ab9914f4e6bf4078d0f087aef12ca3f405bec75ad01cc701301ae21fa2e69e9",
+      "nonce": 48649,
+      "hash": "0000c3bfffd88fb6d2e7c8b8b10f699ccebb8f5f2848ffca07fc55ba5f7444c7"
+    },
+    {
+      "index": 8,
+      "timestamp": "2026-02-18T16:43:27.360Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "8e496b6c-857f-422d-9462-7a6ff247c072",
+            "userId": "bc573a31-02a0-4358-becf-f84780949909",
+            "action": "ADDED_CANDIDATE",
+            "details": "Added sanju to election d3c3e050-166c-43ee-856e-c249b74cea67 | Block: 7",
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-18T16:43:27.360Z"
+          },
+          "timestamp": "2026-02-18T16:43:27.360Z"
+        }
+      ],
+      "previousHash": "0000c3bfffd88fb6d2e7c8b8b10f699ccebb8f5f2848ffca07fc55ba5f7444c7",
+      "merkleRoot": "b36ac2e9254eae93e4853f7f5fbf8e7c33392adc45ea9ce63b285f8f540b6dd3",
+      "nonce": 19119,
+      "hash": "00001637f560ed6c77b1901be96bb5d9e77713232584ad4632fd0cf602b32cb1"
+    },
+    {
+      "index": 9,
+      "timestamp": "2026-02-18T16:43:38.253Z",
+      "transactions": [
+        {
+          "type": "CANDIDATE",
+          "data": {
+            "id": "44e69b8a-1ec9-4055-a441-b0be25a1716b",
+            "name": "fff",
+            "party": "asdas",
+            "symbol": "🌅",
+            "age": 56,
+            "education": "",
+            "experience": "",
+            "keyPoints": [
+              "sfadfad"
+            ],
+            "electionId": "d3c3e050-166c-43ee-856e-c249b74cea67",
+            "createdAt": "2026-02-18T16:43:38.253Z"
+          },
+          "timestamp": "2026-02-18T16:43:38.253Z"
+        }
+      ],
+      "previousHash": "00001637f560ed6c77b1901be96bb5d9e77713232584ad4632fd0cf602b32cb1",
+      "merkleRoot": "29cf6b2b760a15ffe59f417ddbeee496ea4691b289b1cdb8cba1b7285ed7f34f",
+      "nonce": 90836,
+      "hash": "00001aa21b7cf1a21ca2a61f2e7ad56d1e88bb5f9b053b45ede60682bbd65769"
+    },
+    {
+      "index": 10,
+      "timestamp": "2026-02-18T16:43:51.679Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "fb3ea35a-981c-4449-8147-1674be6722cd",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:43:51.679Z"
+          },
+          "timestamp": "2026-02-18T16:43:51.679Z"
+        }
+      ],
+      "previousHash": "00001aa21b7cf1a21ca2a61f2e7ad56d1e88bb5f9b053b45ede60682bbd65769",
+      "merkleRoot": "1f3043b7be307eb0422f0254b82c30ae58bcced12c068bd9263f2ab9c5c45634",
+      "nonce": 18384,
+      "hash": "000058d4cf0f888dd91f3e1d7ebad90d5c1db7e5cee1a23fa6b09c154b8bfb9d"
+    },
+    {
+      "index": 11,
+      "timestamp": "2026-02-18T16:43:56.816Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "5e8aeff7-e5d3-473b-8fe2-44a366b71f6f",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:43:56.814Z"
+          },
+          "timestamp": "2026-02-18T16:43:56.815Z"
+        }
+      ],
+      "previousHash": "000058d4cf0f888dd91f3e1d7ebad90d5c1db7e5cee1a23fa6b09c154b8bfb9d",
+      "merkleRoot": "59f881c8f2097d81f54f3980367ebfbeb8f621459e1af3394e10d898a8cd7849",
+      "nonce": 25797,
+      "hash": "00000e073bbaad3b09fc8c6280476a86ea2ae10af301f0b9d540d4da4eff329f"
+    },
+    {
+      "index": 12,
+      "timestamp": "2026-02-18T16:57:19.153Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "0375f316-b812-4c2c-a48b-f52e37c914d2",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:57:19.153Z"
+          },
+          "timestamp": "2026-02-18T16:57:19.153Z"
+        }
+      ],
+      "previousHash": "00000e073bbaad3b09fc8c6280476a86ea2ae10af301f0b9d540d4da4eff329f",
+      "merkleRoot": "2dbf1ac88b4a67df2ef9ee08f6a1832552ec77131714978151b3029ca245a12a",
+      "nonce": 55646,
+      "hash": "000004c081c88c4e16f78ed506da05c22007f729960f83614bf59031156a791b"
+    },
+    {
+      "index": 13,
+      "timestamp": "2026-02-18T16:57:56.470Z",
+      "transactions": [
+        {
+          "type": "VOTE",
+          "data": {
+            "id": "a8b0e627-dfe0-4c4c-990b-62aa60892747",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "electionId": "d3c3e050-166c-43ee-856e-c249b74cea67",
+            "candidateId": "4181c347-b3e7-4c64-9f71-45ac8c2e20ee",
+            "receiptHash": "0x0047881c0291d4451faa01bdee26cc0386b86e86826c8b69f3c93ec426930a71",
+            "encryptedDetails": "7918324e357fcfa86856c66a0365f910:0f81dc929685936a76cf4680e8fb1fba8b16d6955021b591eb75f0e0424aae91457ad4e3c48bf7b20456d20d7a6d1a15f5e0ec98ce153de0147850ebd502decf8b88e0d5fb77e5834c43b2bba4a01e7828f489b667d5f388e7b541d63e473dd4ef00b5a0f3dedc3d1352c4acd5f9410d2a095d579c6b8100875083c299acb21f",
+            "timestamp": "2026-02-18T16:57:56.470Z"
+          },
+          "timestamp": "2026-02-18T16:57:56.470Z"
+        }
+      ],
+      "previousHash": "000004c081c88c4e16f78ed506da05c22007f729960f83614bf59031156a791b",
+      "merkleRoot": "cffd5f6db7976e4372e60517f5298a44233cdc11d1f11a83e3ebb5911f6be7a3",
+      "nonce": 716,
+      "hash": "00007512bf9951ff505c5c0a2b0de1b7581443a01896f56b1c90782c9e7a98e4"
+    },
+    {
+      "index": 14,
+      "timestamp": "2026-02-18T16:58:17.778Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "f07447a9-2ccb-4d22-a577-12a976515d36",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-18T16:58:17.778Z"
+          },
+          "timestamp": "2026-02-18T16:58:17.778Z"
+        }
+      ],
+      "previousHash": "00007512bf9951ff505c5c0a2b0de1b7581443a01896f56b1c90782c9e7a98e4",
+      "merkleRoot": "ff8ec9beb24caafb1f1ab8bc583f23a1f140fe3d0ddb57e5d985bad2f942e8be",
+      "nonce": 61029,
+      "hash": "0000523d3f3a46f693da98cb75396ebc2679c5d557488c6fbc5b51ab38c9d25e"
+    },
+    {
+      "index": 15,
+      "timestamp": "2026-02-18T16:58:23.319Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "883cae00-fccc-473d-91c5-de803a1fee12",
+            "userId": "42f33c34-e61a-4e24-b0ae-494ef3652065",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::1",
+            "timestamp": "2026-02-18T16:58:23.319Z"
+          },
+          "timestamp": "2026-02-18T16:58:23.319Z"
+        }
+      ],
+      "previousHash": "0000523d3f3a46f693da98cb75396ebc2679c5d557488c6fbc5b51ab38c9d25e",
+      "merkleRoot": "1dc985677b693e5f251c1ef83a039b44461da93d6f0546885ef3406e8c74a3b0",
+      "nonce": 46134,
+      "hash": "00008d71febbe3ea84fe3515c23289138f4bcbf31daf1a598922fef74741ac20"
+    }
+  ]
+}

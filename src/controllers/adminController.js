@@ -1,10 +1,10 @@
+// src/controllers/adminController.js
 const prisma = require('../config/db');
+const blockchainService = require('../blockchain/blockchainService');
 
 // --- 0. VALIDATE ADMIN TOKEN ---
 exports.validateToken = async (req, res) => {
     try {
-        // This endpoint is protected by authMiddleware and roleMiddleware('admin')
-        // If we reach here, the token is valid and user is an admin
         const user = await prisma.user.findUnique({
             where: { userId: req.user.user_id },
             select: {
@@ -47,18 +47,29 @@ exports.validateToken = async (req, res) => {
 // --- 1. GET SYSTEM ANALYTICS ---
 exports.getSystemStats = async (req, res) => {
     try {
-        // Run queries in parallel for performance
-        const [totalVoters, totalVotes, activeElection] = await Promise.all([
-            prisma.user.count({ where: { role: 'voter' } }),
-            prisma.vote.count(),
-            prisma.election.findFirst({ where: { status: 'LIVE' } })
-        ]);
+        // User count still from PostgreSQL
+        const totalVoters = await prisma.user.count({ where: { role: 'voter' } });
+
+        // Vote count and election info from Blockchain
+        const chainStatus = blockchainService.getChainStatus();
+        const elections = blockchainService.getElections();
+        const activeElection = elections.find(e => e.status === 'LIVE');
+
+        // Count total votes from blockchain
+        const allVotes = blockchainService.getFullChain().reduce((count, block) => {
+            return count + block.transactions.filter(tx => tx.type === 'VOTE').length;
+        }, 0);
 
         res.json({
             totalVoters,
-            totalVotes,
+            totalVotes: allVotes,
             activeElection: activeElection ? activeElection.title : "No Live Election",
-            status: "System Operational"
+            status: "System Operational",
+            blockchain: {
+                chainLength: chainStatus.chainLength,
+                totalTransactions: chainStatus.totalTransactions,
+                isValid: chainStatus.isValid
+            }
         });
     } catch (err) {
         console.error(err);
@@ -66,33 +77,38 @@ exports.getSystemStats = async (req, res) => {
     }
 };
 
-// --- 2. CREATE ELECTION ---
+// --- 2. CREATE ELECTION (on Blockchain) ---
 exports.createElection = async (req, res) => {
     try {
         const { title, description, constituency, startTime, endTime } = req.body;
 
-        const newElection = await prisma.election.create({
-            data: {
-                title,
-                description,
-                constituency,
-                startTime: new Date(startTime),
-                endTime: new Date(endTime),
-                status: "LIVE"
-            }
+        // Write election to blockchain
+        const { block, election } = blockchainService.addElection({
+            title,
+            description,
+            constituency,
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+            status: "LIVE"
         });
 
-        // SECURITY: Audit Log
-        await prisma.auditLog.create({
-            data: {
-                userId: req.user.user_id,
-                action: "CREATED_ELECTION",
-                details: `Created: ${title} (${constituency})`,
-                ipAddress: req.ip
-            }
+        // SECURITY: Audit Log on Blockchain
+        blockchainService.addAudit({
+            userId: req.user.user_id,
+            action: "CREATED_ELECTION",
+            details: `Created: ${title} (${constituency}) | Block: ${block.index}`,
+            ipAddress: req.ip
         });
 
-        res.status(201).json({ message: "Election Created", electionId: newElection.id });
+        res.status(201).json({
+            message: "Election Created on Blockchain",
+            electionId: election.id,
+            blockchain: {
+                blockIndex: block.index,
+                blockHash: block.hash,
+                merkleRoot: block.merkleRoot
+            }
+        });
 
     } catch (err) {
         console.error(err);
@@ -100,35 +116,46 @@ exports.createElection = async (req, res) => {
     }
 };
 
-// --- 3. ADD CANDIDATE TO ELECTION ---
+// --- 3. ADD CANDIDATE TO ELECTION (on Blockchain) ---
 exports.addCandidate = async (req, res) => {
     try {
         const { electionId, name, party, symbol, keyPoints, age, education, experience } = req.body;
 
-        const newCandidate = await prisma.candidate.create({
-            data: {
-                electionId,
-                name,
-                party,
-                symbol,
-                age: parseInt(age),
-                education,
-                experience,
-                keyPoints: keyPoints // Expecting array of strings
-            }
+        // Verify election exists on blockchain
+        const election = blockchainService.getElection(electionId);
+        if (!election) {
+            return res.status(404).json({ message: "Election not found on blockchain" });
+        }
+
+        // Write candidate to blockchain
+        const { block, candidate } = blockchainService.addCandidate({
+            electionId,
+            name,
+            party,
+            symbol,
+            age: parseInt(age),
+            education,
+            experience,
+            keyPoints
         });
 
-        // SECURITY: Audit Log
-        await prisma.auditLog.create({
-            data: {
-                userId: req.user.user_id,
-                action: "ADDED_CANDIDATE",
-                details: `Added ${name} to election ${electionId}`,
-                ipAddress: req.ip
-            }
+        // SECURITY: Audit Log on Blockchain
+        blockchainService.addAudit({
+            userId: req.user.user_id,
+            action: "ADDED_CANDIDATE",
+            details: `Added ${name} to election ${electionId} | Block: ${block.index}`,
+            ipAddress: req.ip
         });
 
-        res.status(201).json({ message: "Candidate Added", candidate: newCandidate });
+        res.status(201).json({
+            message: "Candidate Added to Blockchain",
+            candidate: candidate,
+            blockchain: {
+                blockIndex: block.index,
+                blockHash: block.hash,
+                merkleRoot: block.merkleRoot
+            }
+        });
 
     } catch (err) {
         console.error(err);
@@ -136,14 +163,16 @@ exports.addCandidate = async (req, res) => {
     }
 };
 
-// --- 4. GET ALL ELECTIONS (For Dropdown) ---
+// --- 4. GET ALL ELECTIONS (from Blockchain) ---
 exports.getElections = async (req, res) => {
     try {
-        const elections = await prisma.election.findMany({
-            select: { id: true, title: true, status: true }
-        });
-        res.json(elections);
+        const elections = blockchainService.getElections();
+        res.json(elections.map(e => ({
+            id: e.id,
+            title: e.title,
+            status: e.status
+        })));
     } catch (err) {
-        res.status(500).json({ message: "Error fetching elections" });
+        res.status(500).json({ message: "Error fetching elections from blockchain" });
     }
 };

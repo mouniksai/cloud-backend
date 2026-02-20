@@ -149,13 +149,13 @@ exports.verifyOtp = async (req, res) => {
 
         if (!user) return res.status(400).json({ message: "User not found" });
 
-        // Check 1: Is OTP correct? (Allow "123456" as master bypass for easy testing)
-        if (user.otpCode !== otp && otp !== "123456") {
+        // Check 1: Is OTP correct?
+        if (user.otpCode !== otp) {
             return res.status(400).json({ message: "Invalid OTP Code" });
         }
 
-        // Check 2: Is OTP expired? (Bypass if using master code)
-        if (otp !== "123456" && new Date() > new Date(user.otpExpiresAt)) {
+        // Check 2: Is OTP expired?
+        if (new Date() > new Date(user.otpExpiresAt)) {
             return res.status(400).json({ message: "OTP has expired. Login again." });
         }
 

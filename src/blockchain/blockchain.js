@@ -113,46 +113,10 @@ class Blockchain {
         this.difficulty = 4; // Number of leading zeros required (Proof of Work)
         this.chain = [];
         this.pendingTransactions = [];
-        this.dataFile = process.env.BLOCKCHAIN_DATA_PATH || path.join(__dirname, '..', '..', 'blockchain_data.json');
-
-        // SECURITY: Secret key for HMAC file integrity signing
-        // Uses env variable or falls back to a derived key from the data file path
-        this.hmacSecret = process.env.BLOCKCHAIN_SECRET ||
-            crypto.createHash('sha256').update('VoteGuard-Blockchain-Integrity-Key-2026').digest('hex');
+        this.dataFile = path.join(__dirname, '..', '..', 'blockchain_data.json');
 
         // Load existing chain or create genesis block
         this._loadChain();
-    }
-
-    // ---- SECURITY: HMAC File Integrity ----
-
-    /**
-     * Compute HMAC-SHA256 signature of the chain data.
-     * This detects any manual edits to blockchain_data.json.
-     */
-    _computeHMAC(chainData) {
-        return crypto.createHmac('sha256', this.hmacSecret)
-            .update(chainData)
-            .digest('hex');
-    }
-
-    /**
-     * Verify the HMAC signature of the stored file.
-     * Returns true if the file hasn't been tampered with.
-     */
-    _verifyFileIntegrity(fileContent) {
-        try {
-            const parsed = JSON.parse(fileContent);
-            if (!parsed.signature) {
-                console.log('⚠️  No HMAC signature found — upgrading file with signature');
-                return true; // First run after upgrade, allow it
-            }
-            const chainData = JSON.stringify(parsed.chain);
-            const expectedHMAC = this._computeHMAC(chainData);
-            return parsed.signature === expectedHMAC;
-        } catch (e) {
-            return false;
-        }
     }
 
     /**
@@ -172,36 +136,18 @@ class Blockchain {
 
     /**
      * Load chain from JSON file, or create genesis block if file doesn't exist.
-     * SECURITY: Verifies HMAC signature and full chain integrity on startup.
      */
     _loadChain() {
         try {
             if (fs.existsSync(this.dataFile)) {
-                const rawContent = fs.readFileSync(this.dataFile, 'utf8');
-
-                // SECURITY CHECK 1: HMAC File Integrity
-                if (!this._verifyFileIntegrity(rawContent)) {
-                    console.error('🚨 TAMPER DETECTED: blockchain_data.json HMAC signature mismatch!');
-                    console.error('🚨 The file has been manually edited outside the application.');
-                    console.error('🚨 Rejecting tampered data and creating fresh chain.');
-                    this._createGenesisBlock();
-                    return;
-                }
-
-                const data = JSON.parse(rawContent);
+                const data = JSON.parse(fs.readFileSync(this.dataFile, 'utf8'));
                 this.chain = data.chain || [];
                 console.log(`🔗 Blockchain loaded: ${this.chain.length} blocks`);
-                console.log('🔒 HMAC file integrity verified ✅');
 
-                // SECURITY CHECK 2: Full chain validation (hashes, PoW, Merkle)
-                const validation = this.isChainValid();
-                if (!validation.valid) {
-                    console.error('🚨 CHAIN INTEGRITY FAILED:');
-                    validation.errors.forEach(err => console.error(`   ❌ ${err}`));
-                    console.error('🚨 Creating new chain to protect vote integrity.');
+                // Validate loaded chain
+                if (!this.isChainValid()) {
+                    console.error('⚠️  WARNING: Loaded blockchain is INVALID! Creating new chain.');
                     this._createGenesisBlock();
-                } else {
-                    console.log('🔒 Chain integrity verified ✅ (hashes, PoW, Merkle roots)');
                 }
             } else {
                 this._createGenesisBlock();
@@ -213,15 +159,12 @@ class Blockchain {
     }
 
     /**
-     * Save the entire chain to a JSON file with HMAC signature.
-     * SECURITY: The HMAC ensures any manual file edits are detectable.
+     * Save the entire chain to a JSON file for persistence.
      */
     _saveChain() {
         try {
-            const chainData = JSON.stringify(this.chain);
-            const signature = this._computeHMAC(chainData);
-            const fileContent = JSON.stringify({ chain: this.chain, signature }, null, 2);
-            fs.writeFileSync(this.dataFile, fileContent, 'utf8');
+            const data = JSON.stringify({ chain: this.chain }, null, 2);
+            fs.writeFileSync(this.dataFile, data, 'utf8');
         } catch (error) {
             console.error('Error saving blockchain:', error.message);
         }

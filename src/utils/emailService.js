@@ -7,11 +7,7 @@ const transporter = nodemailer.createTransport({
     auth: {
         user: process.env.EMAIL_USER, // Your Gmail address
         pass: process.env.EMAIL_PASS  // Your Gmail App Password
-    },
-    // Force fast timeout (5s) instead of default 60s so login doesn't hang on AWS/HF Spaces
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000
+    }
 });
 
 exports.sendEmailOTP = async (email, otp) => {
@@ -41,8 +37,7 @@ exports.sendEmailOTP = async (email, otp) => {
         console.log(`✅ Email sent to ${email}`);
         return true;
     } catch (error) {
-        console.error("❌ Email Send Failed:", error.message);
-        console.log(`[FALLBACK MOCK EMAIL] To: ${email} | Code: ${otp}`); // Log it so you can still log in!
+        console.error("❌ Email Send Failed:", error);
         return false;
     }
 };

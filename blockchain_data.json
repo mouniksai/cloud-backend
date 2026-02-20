@@ -359,6 +359,50 @@
       "merkleRoot": "1dc985677b693e5f251c1ef83a039b44461da93d6f0546885ef3406e8c74a3b0",
       "nonce": 46134,
       "hash": "00008d71febbe3ea84fe3515c23289138f4bcbf31daf1a598922fef74741ac20"
+    },
+    {
+      "index": 16,
+      "timestamp": "2026-02-20T18:42:07.885Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "1592d3df-c48e-498d-ae99-299f5ace0d1c",
+            "userId": "bc573a31-02a0-4358-becf-f84780949909",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-20T18:42:07.885Z"
+          },
+          "timestamp": "2026-02-20T18:42:07.885Z"
+        }
+      ],
+      "previousHash": "00008d71febbe3ea84fe3515c23289138f4bcbf31daf1a598922fef74741ac20",
+      "merkleRoot": "45f68b5797d357352640cafd4de37520d11f28d89dd16a45a25ec4be2ecca23b",
+      "nonce": 265257,
+      "hash": "0000638f924f7e8a1f2f2b1755cc3843c53b99f8a3ec8029acc550fac0fd8909"
+    },
+    {
+      "index": 17,
+      "timestamp": "2026-02-20T18:42:12.337Z",
+      "transactions": [
+        {
+          "type": "AUDIT",
+          "data": {
+            "id": "a24b9a90-5427-438d-aa5b-2bb5008e244c",
+            "userId": "bc573a31-02a0-4358-becf-f84780949909",
+            "action": "VIEWED_DASHBOARD",
+            "details": null,
+            "ipAddress": "::ffff:127.0.0.1",
+            "timestamp": "2026-02-20T18:42:12.337Z"
+          },
+          "timestamp": "2026-02-20T18:42:12.337Z"
+        }
+      ],
+      "previousHash": "0000638f924f7e8a1f2f2b1755cc3843c53b99f8a3ec8029acc550fac0fd8909",
+      "merkleRoot": "f6610a0e0cd9e1cdc1b373a369f0076c259c9a9d767b36eda6fd784ddacdd3b2",
+      "nonce": 28548,
+      "hash": "00008676c60865a81f8ed792af07760e5004b53f43ef8a1219e9369fc13ee048"
     }
   ]
 }

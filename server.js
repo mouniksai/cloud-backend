@@ -6,22 +6,10 @@ const keyExchangeService = require('./src/utils/keyExchangeService');
 const app = express();
 require('dotenv').config();
 
-// Middleware  
-const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:7860',
-    process.env.CORS_ORIGIN,       // e.g. https://your-space.hf.space
-].filter(Boolean);
-
+// Middleware
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow all origins. 
-        // In HF Spaces, only port 7860 (Next.js) is exposed to the internet.
-        // Port 5001 is strictly internal and accessed via Next.js proxy rewrites,
-        // so strict CORS checking here is unnecessary and causes false rejections.
-        return callback(null, true);
-    },
-    credentials: true
+    origin: 'http://localhost:3000', // Your Next.js frontend URL
+    credentials: true // Enable credentials (cookies)
 }));
 app.use(express.json());
 app.use(cookieParser()); // Add cookie parser middleware

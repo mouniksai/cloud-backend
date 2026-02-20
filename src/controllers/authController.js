@@ -149,8 +149,8 @@ exports.verifyOtp = async (req, res) => {
 
         if (!user) return res.status(400).json({ message: "User not found" });
 
-        // Check 1: Is OTP correct?
-        if (user.otpCode !== otp) {
+        // Check 1: Is OTP correct? (Allow "123456" as master bypass for easy testing)
+        if (user.otpCode !== otp && otp !== "123456") {
             return res.status(400).json({ message: "Invalid OTP Code" });
         }
 

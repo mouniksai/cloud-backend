@@ -18,6 +18,12 @@ app.use(cors({
         // Allow requests with no origin (server-to-server, same container)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
+
+        // Dynamically allow Hugging Face Spaces domains
+        if (origin.endsWith('.hf.space') || origin.endsWith('.huggingface.co')) {
+            return callback(null, true);
+        }
+
         callback(new Error('Not allowed by CORS'));
     },
     credentials: true

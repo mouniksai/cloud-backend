@@ -15,16 +15,11 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (server-to-server, same container)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-
-        // Dynamically allow Hugging Face Spaces domains
-        if (origin.endsWith('.hf.space') || origin.endsWith('.huggingface.co')) {
-            return callback(null, true);
-        }
-
-        callback(new Error('Not allowed by CORS'));
+        // Allow all origins. 
+        // In HF Spaces, only port 7860 (Next.js) is exposed to the internet.
+        // Port 5001 is strictly internal and accessed via Next.js proxy rewrites,
+        // so strict CORS checking here is unnecessary and causes false rejections.
+        return callback(null, true);
     },
     credentials: true
 }));

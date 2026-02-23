@@ -125,6 +125,34 @@ exports.createElection = async (req, res) => {
             });
         }
 
+        // Check for overlapping elections in the same constituency
+        const existingElections = await blockchainService.getElections({
+            constituency: constituency
+        });
+
+        const overlappingElections = existingElections.filter(e => {
+            const existingStart = new Date(e.startTime);
+            const existingEnd = new Date(e.endTime);
+            
+            // Check if time periods overlap
+            // Two periods overlap if: start1 < end2 AND start2 < end1
+            return start < existingEnd && end > existingStart;
+        });
+
+        if (overlappingElections.length > 0) {
+            return res.status(409).json({
+                message: "Overlapping election detected",
+                details: `There ${overlappingElections.length === 1 ? 'is' : 'are'} ${overlappingElections.length} election(s) already scheduled during this time period in ${constituency}`,
+                overlappingElections: overlappingElections.map(e => ({
+                    title: e.title,
+                    startTime: e.startTime,
+                    endTime: e.endTime,
+                    status: e.status
+                })),
+                warning: "Creating overlapping elections may cause confusion for voters. Please adjust the time period or ensure this is intentional."
+            });
+        }
+
         // Write election to blockchain
         const { block, election } = await blockchainService.addElection({
             title,

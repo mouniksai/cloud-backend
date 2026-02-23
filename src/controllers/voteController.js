@@ -27,13 +27,72 @@ exports.getBallot = async (req, res) => {
 
         // B. Find LIVE Election for this constituency from Blockchain
         const now = new Date();
+        
+        // Check if a specific election ID was requested
+        const requestedElectionId = req.query.electionId;
+        
+        if (requestedElectionId) {
+            // Use the specific election requested from dashboard
+            const election = await blockchainService.getElection(requestedElectionId);
+            
+            if (!election) {
+                return res.status(404).json({ message: "Requested election not found." });
+            }
+            
+            if (election.status !== 'LIVE' || new Date(election.endTime) <= now) {
+                return res.status(400).json({ message: "Requested election is not active." });
+            }
+            
+            // Check if user hasn't voted in this election
+            const existingVote = await blockchainService.hasUserVoted(userId, election.id);
+            if (existingVote) {
+                return res.status(403).json({
+                    message: "You have already cast your vote.",
+                    hasVoted: true
+                });
+            }
+            
+            // Continue with this specific election
+            const candidates = await blockchainService.getCandidates(election.id);
+            
+            return res.json({
+                election: {
+                    id: election.id,
+                    title: election.title,
+                    constituency: election.constituency,
+                    endsAt: election.endTime
+                },
+                candidates: candidates.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    party: c.party,
+                    symbol: c.symbol,
+                    keyPoints: c.keyPoints
+                })),
+                hasVoted: false
+            });
+        }
+        
+        // Otherwise, find an available election
         const elections = await blockchainService.getElections({
             constituency: constituency,
             status: 'LIVE'
         });
+        
+        // Sort by start time (most recently started first) for consistency with dashboard
+        elections.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
 
-        // Find one that hasn't ended
-        let election = elections.find(e => new Date(e.endTime) > now);
+        // Find one that hasn't ended and user hasn't voted in
+        let election = null;
+        for (const e of elections) {
+            if (new Date(e.endTime) > now) {
+                const hasVoted = await blockchainService.hasUserVoted(userId, e.id);
+                if (!hasVoted) {
+                    election = e;
+                    break;
+                }
+            }
+        }
 
         if (!election) {
             return res.status(404).json({ message: "No live election found for your constituency." });

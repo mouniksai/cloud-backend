@@ -36,6 +36,9 @@ exports.getDashboardData = async (req, res) => {
             status: 'LIVE'
         });
 
+        // Sort elections by start time (most recently started first) for consistency
+        liveElections.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
         // Find an active election where user hasn't voted
         let activeElection = null;
         for (const election of liveElections) {

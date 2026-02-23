@@ -132,6 +132,21 @@ function updateElectionStatus(electionId, newStatus) {
  * @returns {Object} - { block, candidate }
  */
 function addCandidate(data) {
+    // DUPLICATE CHECK: Prevent adding the same candidate twice
+    const existingCandidates = blockchain.searchTransactions({
+        type: 'CANDIDATE',
+        electionId: data.electionId
+    });
+
+    const duplicate = existingCandidates.find(tx =>
+        tx.data.name.toLowerCase().trim() === data.name.toLowerCase().trim() &&
+        tx.data.party.toLowerCase().trim() === data.party.toLowerCase().trim()
+    );
+
+    if (duplicate) {
+        throw new Error(`Duplicate candidate: ${data.name} from ${data.party} already exists in this election`);
+    }
+
     const candidateId = crypto.randomUUID();
     const transaction = {
         type: 'CANDIDATE',

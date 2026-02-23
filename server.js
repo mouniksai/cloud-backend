@@ -27,10 +27,59 @@ app.use('/api/blockchain', require('./src/routes/blockchainRoutes'));
 
 const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
-    console.log(`VoteGuard Server running on port ${PORT}`);
-    // Initialize RSA key exchange mechanism
-    keyExchangeService.generateKeyPair();
-    // Start the automatic election status updater
-    electionController.startElectionStatusUpdater();
-});
+// ============================================================
+// Blockchain Initialization (Optional - Graceful Fallback)
+// ============================================================
+async function startServer() {
+    let blockchainMode = 'JSON-based';
+
+    try {
+        // Check if blockchain smart contract should be initialized
+        const useJsonBlockchain = process.env.USE_JSON_BLOCKCHAIN !== 'false';
+        const blockchainNetwork = process.env.BLOCKCHAIN_NETWORK;
+
+        // Only try to initialize smart contract if explicitly configured
+        if (!useJsonBlockchain && blockchainNetwork && blockchainNetwork !== 'disabled') {
+            try {
+                console.log('\n🔗 Initializing blockchain smart contract connection...');
+                const blockchainServiceV2 = require('./src/blockchain/blockchainServiceV2');
+                await blockchainServiceV2.initialize();
+                blockchainMode = `Smart Contract (${blockchainNetwork})`;
+                console.log('✅ Blockchain smart contract connected!\n');
+            } catch (blockchainError) {
+                console.warn('\n⚠️  Blockchain initialization failed:', blockchainError.message);
+                console.warn('⚠️  Falling back to JSON-based blockchain\n');
+                blockchainMode = 'JSON-based (fallback)';
+            }
+        } else {
+            console.log('\n📝 Using JSON-based blockchain (traditional mode)\n');
+        }
+
+        // Start Express server (always succeeds even if blockchain fails)
+        app.listen(PORT, () => {
+            console.log('====================================');
+            console.log(`✅ VoteGuard Server Started!`);
+            console.log('====================================');
+            console.log(`📍 Server: http://localhost:${PORT}`);
+            console.log(`🔗 Blockchain: ${blockchainMode}`);
+            console.log('====================================\n');
+
+            // Initialize RSA key exchange mechanism
+            keyExchangeService.generateKeyPair();
+
+            // Start the automatic election status updater
+            electionController.startElectionStatusUpdater();
+        });
+    } catch (error) {
+        console.error('\n❌ FATAL: Server failed to start:', error.message);
+        console.error(error.stack);
+        console.error('\n💡 This is a critical error. Check:');
+        console.error('   1. Database connection (DATABASE_URL)');
+        console.error('   2. Port availability (PORT=5001)');
+        console.error('   3. Required dependencies installed\n');
+        process.exit(1);
+    }
+}
+
+// Start the server
+startServer();

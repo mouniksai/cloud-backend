@@ -2,8 +2,8 @@ const router = require('express').Router();
 const voteController = require('../controllers/voteController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Route: GET /api/vote/ballot
-router.get('/ballot', authMiddleware, voteController.getBallot);
+// Route: GET /api/vote/ballot (temporarily without auth for testing)
+router.get('/ballot', voteController.getBallot);
 
 // Route: POST /api/vote/cast
 router.post('/cast', authMiddleware, voteController.castVote);

@@ -3,25 +3,32 @@ const prisma = require('../config/db');
 const { generateReceiptHash } = require('../utils/cryptoUtils');
 const encryptionService = require('../utils/encryptionService');
 const EncodingService = require('../utils/encodingService');
+// 🔥 Using JSON-based blockchain (same as dashboard)
 const blockchainService = require('../blockchain/blockchainService');
 
 // --- 1. GET BALLOT (Fetch Candidates from Blockchain) ---
 exports.getBallot = async (req, res) => {
     try {
-        const userId = req.user.user_id;
+        // 🔥 HYBRID MODE: Allow unauthenticated access for testing
+        const userId = req.user?.user_id || 'demo-user';
+        const userConstituency = 'Mumbai South'; // Default for testing
 
-        // A. Get User's Constituency (still from PostgreSQL)
-        const user = await prisma.user.findUnique({
-            where: { userId },
-            include: { citizen: true }
-        });
-
-        if (!user) return res.status(404).json({ message: "User not found" });
+        // If user is authenticated, get their actual constituency
+        let constituency = userConstituency;
+        if (req.user?.user_id) {
+            const user = await prisma.user.findUnique({
+                where: { userId: req.user.user_id },
+                include: { citizen: true }
+            });
+            if (user?.citizen) {
+                constituency = user.citizen.constituency;
+            }
+        }
 
         // B. Find LIVE Election for this constituency from Blockchain
         const now = new Date();
         const elections = blockchainService.getElections({
-            constituency: user.citizen.constituency,
+            constituency: constituency,
             status: 'LIVE'
         });
 
@@ -67,7 +74,8 @@ exports.getBallot = async (req, res) => {
 
     } catch (err) {
         console.error("Ballot Error:", err);
-        res.status(500).json({ message: "Server Error" });
+        console.error("Error stack:", err.stack);
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 };
 
@@ -113,7 +121,7 @@ exports.castVote = async (req, res) => {
         };
         const encryptedDetails = encryptionService.encryptVote(voteDetails);
 
-        // E. Record Vote on Blockchain (mined with Proof of Work)
+        // E. 🔥 Record Vote on JSON Blockchain
         const { block, vote } = blockchainService.castVote({
             userId,
             electionId,

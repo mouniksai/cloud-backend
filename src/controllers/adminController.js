@@ -127,7 +127,7 @@ exports.addCandidate = async (req, res) => {
             return res.status(404).json({ message: "Election not found on blockchain" });
         }
 
-        // Write candidate to blockchain
+        // Write candidate to blockchain (includes duplicate check)
         const { block, candidate } = blockchainService.addCandidate({
             electionId,
             name,
@@ -158,8 +158,17 @@ exports.addCandidate = async (req, res) => {
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server Error" });
+        console.error('Add candidate error:', err);
+
+        // Handle duplicate candidate error
+        if (err.message && err.message.includes('Duplicate candidate')) {
+            return res.status(409).json({
+                message: err.message,
+                error: "DUPLICATE_CANDIDATE"
+            });
+        }
+
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 };
 

@@ -2,16 +2,22 @@ require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
 /**
- * Hardhat Configuration for VoteGuard Blockchain
+ * ============================================================
+ * VOTEGUARD - HARDHAT CONFIGURATION (SEPOLIA-FIRST)
+ * ============================================================
  * 
- * NETWORKS SUPPORTED:
- * - localhost: For instant local testing (run: npx hardhat node)
- * - sepolia: Free Ethereum testnet using Alchemy
+ * CRITICAL FOR TEAM SYNC:
+ * - ALWAYS deploy to 'sepolia' network
+ * - NEVER deploy to 'localhost' when working with your team
+ * - Use the SAME CONTRACT_ADDRESS across all team members
  * 
- * ENVIRONMENT VARIABLES REQUIRED (.env file):
- * - ALCHEMY_API_KEY: Get free key from https://www.alchemy.com/
- * - SEPOLIA_PRIVATE_KEY: Your wallet's private key (NEVER commit this!)
+ * REQUIRED ENVIRONMENT VARIABLES (.env):
+ * - ALCHEMY_API_KEY: Your Alchemy API key (free tier)
+ * - SEPOLIA_PRIVATE_KEY: Your wallet's private key (without 0x)
  * - ETHERSCAN_API_KEY: (Optional) For contract verification
+ * 
+ * Get started: https://dashboard.alchemy.com/
+ * ============================================================
  */
 
 module.exports = {
@@ -20,20 +26,17 @@ module.exports = {
         settings: {
             optimizer: {
                 enabled: true,
-                runs: 200, // Optimize for deployment cost vs execution cost
+                runs: 200,
             },
         },
     },
 
     networks: {
-        // Local development network (instant & free)
-        localhost: {
-            url: "http://127.0.0.1:8545",
-            chainId: 31337,
-            // Hardhat provides 20 test accounts automatically
-        },
-
-        // Sepolia testnet (free Ethereum testnet)
+        // ========================================================
+        // PRODUCTION NETWORK: SEPOLIA TESTNET
+        // ========================================================
+        // This is your team's "source of truth"
+        // Deploy here once, everyone connects to same contract
         sepolia: {
             url: process.env.ALCHEMY_API_KEY
                 ? `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
@@ -45,17 +48,23 @@ module.exports = {
             gasPrice: "auto",
         },
 
-        // Optional: Add more networks as needed
-        // amoy: { // Polygon testnet
-        //   url: `https://polygon-amoy.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-        //   accounts: [process.env.SEPOLIA_PRIVATE_KEY],
-        //   chainId: 80002,
+        // ========================================================
+        // LOCAL NETWORK (DISABLED FOR TEAM WORK)
+        // ========================================================
+        // Uncomment ONLY if you need to test contract logic locally
+        // WARNING: Any data here will NOT sync with your team!
+        // 
+        // localhost: {
+        //     url: "http://127.0.0.1:8545",
+        //     chainId: 31337,
         // },
     },
 
     // Etherscan verification (optional but recommended)
     etherscan: {
-        apiKey: process.env.ETHERSCAN_API_KEY || "",
+        apiKey: {
+            sepolia: process.env.ETHERSCAN_API_KEY || "",
+        },
     },
 
     // Gas reporting (useful for optimization)
@@ -73,3 +82,4 @@ module.exports = {
         artifacts: "./artifacts",
     },
 };
+

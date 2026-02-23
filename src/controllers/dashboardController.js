@@ -1,6 +1,7 @@
 // src/controllers/dashboardController.js
 const prisma = require('../config/db');
-const blockchainService = require('../blockchain/blockchainService');
+// 🔥 SEPOLIA-FIRST: Using smart contract service (no local blockchain!)
+const blockchainService = require('../blockchain/blockchainServiceV2');
 
 // Helper function to calculate time remaining
 const calculateTimeRemaining = (endTime) => {
@@ -30,7 +31,7 @@ exports.getDashboardData = async (req, res) => {
 
         // 2. Fetch Active Elections from Blockchain
         const now = new Date();
-        const liveElections = blockchainService.getElections({
+        const liveElections = await blockchainService.getElections({
             constituency: user.citizen.constituency,
             status: 'LIVE'
         });
@@ -39,7 +40,7 @@ exports.getDashboardData = async (req, res) => {
         let activeElection = null;
         for (const election of liveElections) {
             if (new Date(election.endTime) > now) {
-                const hasVoted = blockchainService.hasUserVoted(userId, election.id);
+                const hasVoted = await blockchainService.hasUserVoted(userId, election.id);
                 if (!hasVoted) {
                     activeElection = election;
                     break;
@@ -48,28 +49,28 @@ exports.getDashboardData = async (req, res) => {
         }
 
         // 3. Fetch User's Voting History from Blockchain
-        const userVotes = blockchainService.getUserVotes(userId);
+        const userVotes = await blockchainService.getUserVotes(userId);
 
-        const history = userVotes.map(vote => {
-            const election = blockchainService.getElection(vote.data.electionId);
-            const candidates = blockchainService.getCandidates(vote.data.electionId);
-            const candidate = candidates.find(c => c.id === vote.data.candidateId);
+        const history = await Promise.all(userVotes.map(async vote => {
+            const election = await blockchainService.getElection(vote.electionId);
+            const candidates = await blockchainService.getCandidates(vote.electionId);
+            const candidate = candidates.find(c => c.id === vote.candidateId);
 
             return {
-                id: vote.data.id,
+                id: vote.id,
                 election: election ? election.title : 'Unknown',
                 candidate: candidate ? candidate.name : 'Unknown',
-                date: new Date(vote.data.timestamp).toLocaleDateString('en-US', {
+                date: new Date(vote.timestamp).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric'
                 }),
-                receiptHash: vote.data.receiptHash,
+                receiptHash: vote.receiptHash,
                 status: "Confirmed on Blockchain",
-                blockIndex: vote.blockIndex,
-                blockHash: vote.blockHash
+                blockIndex: 0,
+                blockHash: '0x0'
             };
-        });
+        }));
 
         // Sort history by timestamp desc
         history.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -93,15 +94,8 @@ exports.getDashboardData = async (req, res) => {
                 eligible: true
             } : null,
             history: history,
-            blockchain: blockchainService.getChainStatus()
+            blockchain: await blockchainService.getChainStatus()
         };
-
-        // 5. SECURITY: Audit log on blockchain
-        blockchainService.addAudit({
-            userId: userId,
-            action: "VIEWED_DASHBOARD",
-            ipAddress: req.ip
-        });
 
         res.json(dashboardData);
 

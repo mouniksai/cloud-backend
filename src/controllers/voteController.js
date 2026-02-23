@@ -3,8 +3,8 @@ const prisma = require('../config/db');
 const { generateReceiptHash } = require('../utils/cryptoUtils');
 const encryptionService = require('../utils/encryptionService');
 const EncodingService = require('../utils/encodingService');
-// 🔥 Using JSON-based blockchain (same as dashboard)
-const blockchainService = require('../blockchain/blockchainService');
+// 🔥 MIGRATED TO SEPOLIA: Using smart contract service (no more blockchain_data.json!)
+const blockchainService = require('../blockchain/blockchainServiceV2');
 
 // --- 1. GET BALLOT (Fetch Candidates from Blockchain) ---
 exports.getBallot = async (req, res) => {
@@ -27,32 +27,43 @@ exports.getBallot = async (req, res) => {
 
         // B. Find LIVE Election for this constituency from Blockchain
         const now = new Date();
-        const elections = blockchainService.getElections({
+        const elections = await blockchainService.getElections({
             constituency: constituency,
             status: 'LIVE'
         });
 
         // Find one that hasn't ended
-        const election = elections.find(e => new Date(e.endTime) > now);
+        let election = elections.find(e => new Date(e.endTime) > now);
 
         if (!election) {
             return res.status(404).json({ message: "No live election found for your constituency." });
         }
 
+        // CRITICAL: Update election status on blockchain if needed
+        if (election.status === 'LIVE' && election.blockchainStatus === 'UPCOMING') {
+            console.log(`🔄 Updating election status on blockchain: ${election.title} -> LIVE`);
+            try {
+                await blockchainService.updateElectionStatus(election.id, 'LIVE');
+                console.log(`✅ Election status updated to LIVE on blockchain`);
+            } catch (statusUpdateError) {
+                console.error('Failed to update election status:', statusUpdateError);
+                // Continue anyway - the election might already be updated
+            }
+        }
+
         // C. Check if User already voted (from Blockchain)
-        const existingVote = blockchainService.hasUserVoted(userId, election.id);
+        const existingVote = await blockchainService.hasUserVoted(userId, election.id);
 
         if (existingVote) {
             return res.status(403).json({
                 message: "You have already cast your vote.",
-                hasVoted: true,
-                receiptHash: existingVote.data.receiptHash,
-                timestamp: existingVote.data.timestamp
+                hasVoted: true
             });
+
         }
 
         // D. Get candidates from Blockchain
-        const candidates = blockchainService.getCandidates(election.id);
+        const candidates = await blockchainService.getCandidates(election.id);
 
         // E. Return Ballot
         res.json({
@@ -86,25 +97,42 @@ exports.castVote = async (req, res) => {
         const { electionId, candidateId } = req.body;
 
         // Check if election exists and is still active (from Blockchain)
-        const election = blockchainService.getElection(electionId);
+        const election = await blockchainService.getElection(electionId);
 
         if (!election) {
             return res.status(404).json({ message: "Election not found." });
         }
 
         const now = new Date();
+
+        // CRITICAL: Update election status on blockchain if needed
+        // The smart contract checks its stored status, not calculated status
+        if (election.status === 'LIVE' && election.blockchainStatus === 'UPCOMING') {
+            console.log(`🔄 Updating election status on blockchain: ${election.title} -> LIVE`);
+            try {
+                await blockchainService.updateElectionStatus(electionId, 'LIVE');
+                console.log(`✅ Election status updated to LIVE on blockchain`);
+            } catch (statusUpdateError) {
+                console.error('Failed to update election status:', statusUpdateError);
+                // Continue anyway - the election might already be updated by another request
+            }
+        }
+
         if (election.status !== 'LIVE' || new Date(election.endTime) <= now) {
-            return res.status(400).json({ message: "Election has ended or is not active." });
+            return res.status(400).json({
+                message: "Election has ended or is not active.",
+                details: `Election status: ${election.status}, Current time: ${now.toISOString()}, End time: ${election.endTime}`
+            });
         }
 
         // A. Double-Vote Check (from Blockchain)
-        const alreadyVoted = blockchainService.hasUserVoted(userId, electionId);
+        const alreadyVoted = await blockchainService.hasUserVoted(userId, electionId);
         if (alreadyVoted) {
             return res.status(409).json({ message: "You have already voted in this election." });
         }
 
         // B. Verify candidate exists in this election
-        const candidates = blockchainService.getCandidates(electionId);
+        const candidates = await blockchainService.getCandidates(electionId);
         const candidate = candidates.find(c => c.id === candidateId);
         if (!candidate) {
             return res.status(404).json({ message: "Candidate not found in this election." });
@@ -122,7 +150,7 @@ exports.castVote = async (req, res) => {
         const encryptedDetails = encryptionService.encryptVote(voteDetails);
 
         // E. 🔥 Record Vote on JSON Blockchain
-        const { block, vote } = blockchainService.castVote({
+        const { block, vote } = await blockchainService.castVote({
             userId,
             electionId,
             candidateId,
@@ -130,15 +158,7 @@ exports.castVote = async (req, res) => {
             encryptedDetails
         });
 
-        // F. Create Audit Log on Blockchain
-        blockchainService.addAudit({
-            userId,
-            action: "CAST_VOTE",
-            details: `Voted in election ${electionId} | Receipt: ${receiptHash} | Block: ${block.index}`,
-            ipAddress: req.ip
-        });
-
-        // G. ENCODING IMPLEMENTATION - Generate encoded receipt formats
+        // F. ENCODING IMPLEMENTATION - Generate encoded receipt formats
         const receiptData = {
             receiptHash: receiptHash,
             timestamp: vote.timestamp,
@@ -183,13 +203,13 @@ exports.decryptVoteDetails = async (req, res) => {
         const { voteId } = req.params;
 
         // Search blockchain for this vote
-        const votes = blockchainService.getBlockchainInstance
-            ? require('../blockchain/blockchainService').getFullChain()
+        const votes = blockchainService.getFullChain
+            ? blockchainService.getFullChain()
             : [];
 
         // Search all blocks for the vote
         const allVotes = blockchainService.searchTransactions
-            ? blockchainService.getBlockchainInstance().searchTransactions({ type: 'VOTE', id: voteId })
+            ? blockchainService.searchTransactions({ type: 'VOTE', id: voteId })
             : [];
 
         // Fallback: search by ID through blockchain service
@@ -261,7 +281,7 @@ exports.verifyEncodedReceipt = async (req, res) => {
         }
 
         // Verify the receipt exists in blockchain
-        const verification = blockchainService.verifyVote(decodedData.receiptHash);
+        const verification = await blockchainService.verifyVote(decodedData.receiptHash);
 
         if (!verification) {
             return res.status(404).json({
@@ -271,7 +291,7 @@ exports.verifyEncodedReceipt = async (req, res) => {
         }
 
         // Get election info from blockchain
-        const election = blockchainService.getElection(verification.vote.electionId);
+        const election = await blockchainService.getElection(verification.vote.electionId);
 
         res.json({
             success: true,
@@ -312,7 +332,7 @@ exports.verifyDigitalSignature = async (req, res) => {
         }
 
         // 2. Look up the vote on the blockchain
-        const verification = blockchainService.verifyVote(receiptHash);
+        const verification = await blockchainService.verifyVote(receiptHash);
 
         // 3. Check if vote exists
         if (!verification) {
@@ -348,9 +368,9 @@ exports.verifyDigitalSignature = async (req, res) => {
         }
 
         // Get candidate and election info from blockchain
-        const candidates = blockchainService.getCandidates(vote.electionId);
+        const candidates = await blockchainService.getCandidates(vote.electionId);
         const candidateInfo = candidates.find(c => c.id === vote.candidateId);
-        const election = blockchainService.getElection(vote.electionId);
+        const election = await blockchainService.getElection(vote.electionId);
 
         // 5. Return comprehensive verification result
         res.json({

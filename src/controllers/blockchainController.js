@@ -1,10 +1,11 @@
 // src/controllers/blockchainController.js
-const blockchainService = require('../blockchain/blockchainService');
+// 🔥 MIGRATED TO SEPOLIA: Using smart contract service (no more blockchain_data.json!)
+const blockchainService = require('../blockchain/blockchainServiceV2');
 
 // GET /api/blockchain/status - Chain status and statistics
 exports.getChainStatus = async (req, res) => {
     try {
-        const status = blockchainService.getChainStatus();
+        const status = await blockchainService.getChainStatus();
         res.json(status);
     } catch (err) {
         console.error('Chain status error:', err);

@@ -1,6 +1,6 @@
 // src/blockchain/blockchainServiceV2.js
-// Smart Contract Integration Service - Replaces JSON-based storage
-// This service connects your app to the Ethereum blockchain
+// Smart Contract Integration Service - Sepolia-First (NO LOCAL BLOCKCHAIN!)
+// This service connects your app EXCLUSIVELY to Sepolia testnet
 
 const { ethers } = require('ethers');
 const fs = require('fs');
@@ -8,15 +8,22 @@ const path = require('path');
 require('dotenv').config();
 
 /**
- * VoteGuard Blockchain Service - Smart Contract Version
+ * ============================================================
+ * VOTEGUARD BLOCKCHAIN SERVICE - SEPOLIA ONLY
+ * ============================================================
  * 
- * REPLACES: blockchainService.js (JSON-based)
- * PROVIDES: Ethereum blockchain storage via Smart Contract
+ * CRITICAL: This service ONLY connects to Sepolia testnet
+ * - NO local blockchain support (prevents sync issues)
+ * - NO blockchain_data.json files (everything on Sepolia)
+ * - One contract address for entire team
  * 
- * MIGRATION GUIDE:
- * 1. This service maintains the same API as blockchainService.js
- * 2. Simply replace the import in your routes/controllers
- * 3. All functions return the same data structures
+ * REQUIRED ENV VARIABLES:
+ * - BLOCKCHAIN_NETWORK: Must be 'sepolia'
+ * - CONTRACT_ADDRESS: Your deployed contract (0xE08b2c...)
+ * - ALCHEMY_API_KEY: Your Alchemy API key
+ * - SEPOLIA_PRIVATE_KEY: Your wallet's private key
+ * 
+ * ============================================================
  */
 
 class BlockchainServiceV2 {
@@ -24,46 +31,62 @@ class BlockchainServiceV2 {
         this.provider = null;
         this.contract = null;
         this.signer = null;
-        this.network = process.env.BLOCKCHAIN_NETWORK || 'localhost';
+        this.network = process.env.BLOCKCHAIN_NETWORK || 'sepolia';
         this.contractAddress = process.env.CONTRACT_ADDRESS;
         this.initialized = false;
     }
 
     /**
-     * Initialize connection to blockchain
+     * Initialize connection to Sepolia blockchain
      * Call this once when server starts
      */
     async initialize() {
         try {
-            console.log(`\n🔗 Connecting to ${this.network} blockchain...`);
+            console.log(`\n🔗 Connecting to Sepolia blockchain...`);
 
-            // Setup provider based on network
-            if (this.network === 'localhost') {
-                this.provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
-            } else if (this.network === 'sepolia') {
-                const alchemyKey = process.env.ALCHEMY_API_KEY;
-                if (!alchemyKey) {
-                    throw new Error('ALCHEMY_API_KEY not set in .env');
-                }
-                this.provider = new ethers.JsonRpcProvider(
-                    `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
+            // FORCE Sepolia network only
+            if (this.network !== 'sepolia') {
+                throw new Error(
+                    `❌ INVALID NETWORK: ${this.network}\n` +
+                    `   BLOCKCHAIN_NETWORK must be 'sepolia' for team sync!\n` +
+                    `   Set BLOCKCHAIN_NETWORK=sepolia in your .env file`
                 );
-            } else {
-                throw new Error(`Unsupported network: ${this.network}`);
             }
 
-            // Setup signer
+            // Validate required environment variables
+            const alchemyKey = process.env.ALCHEMY_API_KEY;
+            if (!alchemyKey) {
+                throw new Error(
+                    '❌ ALCHEMY_API_KEY not set in .env\n' +
+                    '   Get your free API key from: https://dashboard.alchemy.com/'
+                );
+            }
+
             const privateKey = process.env.SEPOLIA_PRIVATE_KEY;
             if (!privateKey) {
-                throw new Error('SEPOLIA_PRIVATE_KEY not set in .env');
+                throw new Error(
+                    '❌ SEPOLIA_PRIVATE_KEY not set in .env\n' +
+                    '   Export your MetaMask private key (Account Details > Export Private Key)'
+                );
             }
+
+            if (!this.contractAddress) {
+                throw new Error(
+                    '❌ CONTRACT_ADDRESS not set in .env\n' +
+                    `   Your team's contract is: 0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2\n` +
+                    '   Add this to your .env: CONTRACT_ADDRESS=0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2'
+                );
+            }
+
+            // Setup Sepolia provider
+            this.provider = new ethers.JsonRpcProvider(
+                `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
+            );
+
+            // Setup signer
             this.signer = new ethers.Wallet(privateKey, this.provider);
 
-            // Load contract
-            if (!this.contractAddress) {
-                throw new Error('CONTRACT_ADDRESS not set in .env. Deploy contract first.');
-            }
-
+            // Load contract ABI
             const contractArtifact = this._loadContractArtifact();
             this.contract = new ethers.Contract(
                 this.contractAddress,
@@ -71,13 +94,15 @@ class BlockchainServiceV2 {
                 this.signer
             );
 
-            // Verify connection
+            // Verify connection by reading chain length
             const chainLength = await this.contract.chainLength();
-            console.log('✅ Connected to blockchain');
-            console.log(`├─ Network: ${this.network}`);
+
+            console.log('✅ Connected to Sepolia blockchain');
+            console.log(`├─ Network: Sepolia Testnet (Chain ID: 11155111)`);
             console.log(`├─ Contract: ${this.contractAddress}`);
             console.log(`├─ Signer: ${this.signer.address}`);
-            console.log(`└─ Chain Length: ${chainLength}\n`);
+            console.log(`├─ Chain Length: ${chainLength}`);
+            console.log(`└─ Explorer: https://sepolia.etherscan.io/address/${this.contractAddress}\n`);
 
             this.initialized = true;
             return true;
@@ -198,17 +223,44 @@ class BlockchainServiceV2 {
             const electionId = await this.contract.electionIds(i);
             const election = await this.contract.getElection(electionId);
 
+            // Convert timestamps
+            const startTime = new Date(Number(election.startTime) * 1000);
+            const endTime = new Date(Number(election.endTime) * 1000);
+            const now = new Date();
+
+            // Calculate DYNAMIC status based on current time
+            let actualStatus;
+            if (now < startTime) {
+                actualStatus = 'UPCOMING';
+            } else if (now >= startTime && now < endTime) {
+                actualStatus = 'LIVE';
+            } else {
+                actualStatus = 'ENDED';
+            }
+
             // Convert to API format
             const electionData = {
                 id: electionId,
                 title: election.title,
                 description: election.description,
                 constituency: election.constituency,
-                startTime: new Date(Number(election.startTime) * 1000).toISOString(),
-                endTime: new Date(Number(election.endTime) * 1000).toISOString(),
-                status: ['UPCOMING', 'LIVE', 'ENDED', 'CANCELLED'][election.status],
+                startTime: startTime.toISOString(),
+                endTime: endTime.toISOString(),
+                status: actualStatus, // Use dynamically calculated status
+                blockchainStatus: ['UPCOMING', 'LIVE', 'ENDED', 'CANCELLED'][election.status], // Original status from blockchain
                 createdAt: new Date(Number(election.createdAt) * 1000).toISOString(),
             };
+
+            // Debug logging for status calculation
+            if (i === 0) { // Only log first election to avoid spam
+                console.log(`📊 Election Status Calculation:
+                    Title: ${electionData.title}
+                    Current Time: ${now.toISOString()}
+                    Start Time: ${startTime.toISOString()}
+                    End Time: ${endTime.toISOString()}
+                    Calculated Status: ${actualStatus}
+                    Blockchain Status: ${electionData.blockchainStatus}`);
+            }
 
             // Apply filters
             if (filter.constituency && electionData.constituency !== filter.constituency) {
@@ -238,14 +290,30 @@ class BlockchainServiceV2 {
 
             if (!election.exists) return null;
 
+            // Convert timestamps
+            const startTime = new Date(Number(election.startTime) * 1000);
+            const endTime = new Date(Number(election.endTime) * 1000);
+            const now = new Date();
+
+            // Calculate DYNAMIC status based on current time
+            let actualStatus;
+            if (now < startTime) {
+                actualStatus = 'UPCOMING';
+            } else if (now >= startTime && now < endTime) {
+                actualStatus = 'LIVE';
+            } else {
+                actualStatus = 'ENDED';
+            }
+
             return {
                 id: id,
                 title: election.title,
                 description: election.description,
                 constituency: election.constituency,
-                startTime: new Date(Number(election.startTime) * 1000).toISOString(),
-                endTime: new Date(Number(election.endTime) * 1000).toISOString(),
-                status: ['UPCOMING', 'LIVE', 'ENDED', 'CANCELLED'][election.status],
+                startTime: startTime.toISOString(),
+                endTime: endTime.toISOString(),
+                status: actualStatus, // Use dynamically calculated status
+                blockchainStatus: ['UPCOMING', 'LIVE', 'ENDED', 'CANCELLED'][election.status], // Original status from blockchain
                 createdAt: new Date(Number(election.createdAt) * 1000).toISOString(),
             };
         } catch (error) {
@@ -332,15 +400,20 @@ class BlockchainServiceV2 {
 
         for (const candidateId of candidateIds) {
             const candidate = await this.contract.getCandidate(candidateId);
+
+            // Get vote count for this candidate
+            const voteCount = await this.getCandidateVoteCount(candidateId);
+
             candidates.push({
                 id: candidateId,
                 name: candidate.name,
                 party: candidate.party,
                 symbol: candidate.symbol,
-                age: candidate.age,
+                age: Number(candidate.age), // Convert BigInt to Number
                 education: candidate.education,
                 experience: candidate.experience,
                 electionId: id,
+                voteCount: voteCount, // Include vote count
                 createdAt: new Date(Number(candidate.createdAt) * 1000).toISOString(),
             });
         }
@@ -470,6 +543,19 @@ class BlockchainServiceV2 {
     }
 
     /**
+     * Check if user has voted in an election
+     * @param {string} userId
+     * @param {string} electionId
+     * @returns {boolean}
+     */
+    async hasUserVoted(userId, electionId) {
+        this._ensureInitialized();
+
+        const votes = await this.getVotesByUser(userId);
+        return votes.some(vote => vote.electionId === electionId);
+    }
+
+    /**
      * Get vote count for a candidate
      * @param {string} candidateId
      * @returns {number}
@@ -571,20 +657,28 @@ module.exports = {
     // Candidates
     addCandidate: (data) => blockchainService.addCandidate(data),
     getCandidatesByElection: (electionId) => blockchainService.getCandidatesByElection(electionId),
+    getCandidates: (electionId) => blockchainService.getCandidatesByElection(electionId), // Alias for backward compatibility
 
     // Votes
     castVote: (data) => blockchainService.castVote(data),
     verifyVote: (receiptHash) => blockchainService.verifyVote(receiptHash),
     getVotesByUser: (userId) => blockchainService.getVotesByUser(userId),
+    getUserVotes: (userId) => blockchainService.getVotesByUser(userId), // Alias for backward compatibility
     getVotesByElection: (electionId) => blockchainService.getVotesByElection(electionId),
     getCandidateVoteCount: (candidateId) => blockchainService.getCandidateVoteCount(candidateId),
+    hasUserVoted: (userId, electionId) => blockchainService.hasUserVoted(userId, electionId), // New method
 
     // Audit
     addAuditLog: (data) => blockchainService.addAuditLog(data),
+    addAudit: (data) => blockchainService.addAuditLog(data), // Alias for backward compatibility
 
     // Blockchain
     getStats: () => blockchainService.getStats(),
+    getChainStatus: () => blockchainService.getStats(), // Alias for backward compatibility
     isChainValid: () => blockchainService.isChainValid(),
+
+    // Mock methods for compatibility (not needed with smart contracts)
+    getFullChain: () => [], // Smart contracts don't expose full chain
 
     // Direct access to service instance
     service: blockchainService,

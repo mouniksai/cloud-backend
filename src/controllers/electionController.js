@@ -1,6 +1,7 @@
 // src/controllers/electionController.js
 const prisma = require('../config/db');
-const blockchainService = require('../blockchain/blockchainService');
+// 🔥 MIGRATED TO SEPOLIA: Using smart contract service (no more blockchain_data.json!)
+const blockchainService = require('../blockchain/blockchainServiceV2');
 
 // Helper function to calculate time remaining
 const calculateTimeRemaining = (endTime) => {
@@ -30,7 +31,7 @@ exports.getElectionResults = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // Fetch all elections for the user's constituency from Blockchain
-        const elections = blockchainService.getElections({
+        const elections = await blockchainService.getElections({
             constituency: user.citizen.constituency
         });
 
@@ -38,9 +39,9 @@ exports.getElectionResults = async (req, res) => {
         elections.sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
 
         // Enrich each election with candidates and vote counts from Blockchain
-        const electionsWithDetails = elections.map(election => {
-            const candidates = blockchainService.getCandidates(election.id);
-            const electionVotes = blockchainService.getElectionVotes(election.id);
+        const electionsWithDetails = await Promise.all(elections.map(async election => {
+            const candidates = await blockchainService.getCandidates(election.id);
+            const electionVotes = await blockchainService.getVotesByElection(election.id);
 
             // Sort candidates by voteCount descending
             candidates.sort((a, b) => b.voteCount - a.voteCount);
@@ -60,33 +61,24 @@ exports.getElectionResults = async (req, res) => {
                     name: c.name,
                     party: c.party,
                     symbol: c.symbol,
-                    keyPoints: c.keyPoints,
+                    keyPoints: c.keyPoints || [], // Default to empty array if not available
                     voteCount: c.voteCount,
                     age: c.age,
                     education: c.education,
                     experience: c.experience
                 })),
                 votes: electionVotes.map(v => ({
-                    id: v.data.id,
-                    timestamp: v.data.timestamp
+                    id: v.id,
+                    timestamp: v.timestamp
                 })),
                 totalVotes,
                 timeRemaining: election.status === 'LIVE' ? calculateTimeRemaining(election.endTime) : null,
                 winner: election.status === 'ENDED' && candidates.length > 0
                     ? candidates.reduce((winner, c) =>
                         c.voteCount > (winner?.voteCount || 0) ? c : winner, null)
-                    : null,
-                blockIndex: election.blockIndex,
-                blockHash: election.blockHash
+                    : null
             };
-        });
-
-        // Audit log on blockchain
-        blockchainService.addAudit({
-            userId: userId,
-            action: "VIEWED_ELECTION_RESULTS",
-            ipAddress: req.ip
-        });
+        }));
 
         res.json({
             elections: electionsWithDetails,
@@ -110,17 +102,17 @@ exports.getElectionDetails = async (req, res) => {
         const { id } = req.params;
 
         // Get election from Blockchain
-        const election = blockchainService.getElection(id);
+        const election = await blockchainService.getElection(id);
 
         if (!election) {
             return res.status(404).json({ message: "Election not found" });
         }
 
         // Get candidates and votes from Blockchain
-        const candidates = blockchainService.getCandidates(id);
+        const candidates = await blockchainService.getCandidates(id);
         candidates.sort((a, b) => b.voteCount - a.voteCount);
 
-        const votes = blockchainService.getElectionVotes(id);
+        const votes = await blockchainService.getVotesByElection(id);
         const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
 
         const winner = election.status === 'ENDED' && candidates.length > 0
@@ -130,8 +122,8 @@ exports.getElectionDetails = async (req, res) => {
         // Vote timeline (anonymized)
         const voteTimeline = votes
             .map(v => ({
-                timestamp: v.data.timestamp,
-                blockIndex: v.blockIndex
+                timestamp: v.timestamp,
+                voteId: v.id
             }))
             .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
@@ -148,7 +140,7 @@ exports.getElectionDetails = async (req, res) => {
                 name: c.name,
                 party: c.party,
                 symbol: c.symbol,
-                keyPoints: c.keyPoints,
+                keyPoints: c.keyPoints || [], // Default to empty array if not available
                 voteCount: c.voteCount,
                 age: c.age,
                 education: c.education,
@@ -159,12 +151,8 @@ exports.getElectionDetails = async (req, res) => {
             timeRemaining: election.status === 'LIVE' ? calculateTimeRemaining(election.endTime) : null,
             analytics: {
                 voteTimeline,
-                turnoutPercentage: 85.2,
+                turnoutPercentage: totalVotes > 0 ? Math.round((totalVotes / 1000) * 100) / 100 : 0,
                 peakVotingHour: '14:00'
-            },
-            blockchainProof: {
-                blockIndex: election.blockIndex,
-                blockHash: election.blockHash
             }
         };
 

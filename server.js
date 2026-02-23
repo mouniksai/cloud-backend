@@ -3,18 +3,23 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const electionController = require('./src/controllers/electionController');
 const keyExchangeService = require('./src/utils/keyExchangeService');
+const blockchainServiceV2 = require('./src/blockchain/blockchainServiceV2');
 const app = express();
 require('dotenv').config();
 
-// Middleware
+// ============================================================
+// MIDDLEWARE
+// ============================================================
 app.use(cors({
-    origin: 'http://localhost:3000', // Your Next.js frontend URL
-    credentials: true // Enable credentials (cookies)
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true
 }));
 app.use(express.json());
-app.use(cookieParser()); // Add cookie parser middleware
+app.use(cookieParser());
 
-// Routes
+// ============================================================
+// ROUTES
+// ============================================================
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/admin', require('./src/routes/adminRoutes'));
 app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
@@ -24,45 +29,50 @@ app.use('/api/verification', require('./src/routes/verificationRoutes'));
 app.use('/api/keys', require('./src/routes/keyRoutes'));
 app.use('/api/blockchain', require('./src/routes/blockchainRoutes'));
 
-
 const PORT = process.env.PORT || 5001;
 
 // ============================================================
-// Blockchain Initialization (Optional - Graceful Fallback)
+// SERVER STARTUP WITH SEPOLIA BLOCKCHAIN INITIALIZATION
 // ============================================================
 async function startServer() {
-    let blockchainMode = 'JSON-based';
-
     try {
-        // Check if blockchain smart contract should be initialized
-        const useJsonBlockchain = process.env.USE_JSON_BLOCKCHAIN !== 'false';
-        const blockchainNetwork = process.env.BLOCKCHAIN_NETWORK;
+        console.log('\n╔═══════════════════════════════════════════════════════╗');
+        console.log('║         🛡️  VOTEGUARD SERVER STARTING...            ║');
+        console.log('╚═══════════════════════════════════════════════════════╝\n');
 
-        // Only try to initialize smart contract if explicitly configured
-        if (!useJsonBlockchain && blockchainNetwork && blockchainNetwork !== 'disabled') {
-            try {
-                console.log('\n🔗 Initializing blockchain smart contract connection...');
-                const blockchainServiceV2 = require('./src/blockchain/blockchainServiceV2');
-                await blockchainServiceV2.initialize();
-                blockchainMode = `Smart Contract (${blockchainNetwork})`;
-                console.log('✅ Blockchain smart contract connected!\n');
-            } catch (blockchainError) {
-                console.warn('\n⚠️  Blockchain initialization failed:', blockchainError.message);
-                console.warn('⚠️  Falling back to JSON-based blockchain\n');
-                blockchainMode = 'JSON-based (fallback)';
-            }
-        } else {
-            console.log('\n📝 Using JSON-based blockchain (traditional mode)\n');
+        // CRITICAL: Initialize Sepolia blockchain connection
+        console.log('🔗 Initializing Sepolia blockchain connection...\n');
+
+        try {
+            await blockchainServiceV2.initialize();
+            console.log('✅ Blockchain service ready!\n');
+        } catch (blockchainError) {
+            console.error('\n╔═══════════════════════════════════════════════════════╗');
+            console.error('║  ❌ BLOCKCHAIN INITIALIZATION FAILED                  ║');
+            console.error('╚═══════════════════════════════════════════════════════╝\n');
+            console.error('Error:', blockchainError.message);
+            console.error('\n💡 TROUBLESHOOTING CHECKLIST:');
+            console.error('   1. ✓ Copy .env.example to .env');
+            console.error('   2. ✓ Set BLOCKCHAIN_NETWORK=sepolia');
+            console.error('   3. ✓ Set CONTRACT_ADDRESS=0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2');
+            console.error('   4. ✓ Set ALCHEMY_API_KEY (get from https://dashboard.alchemy.com/)');
+            console.error('   5. ✓ Set SEPOLIA_PRIVATE_KEY (export from MetaMask)\n');
+            console.error('❌ Server cannot start without blockchain connection.\n');
+            process.exit(1);
         }
 
-        // Start Express server (always succeeds even if blockchain fails)
+        // Start Express server
         app.listen(PORT, () => {
-            console.log('====================================');
-            console.log(`✅ VoteGuard Server Started!`);
-            console.log('====================================');
-            console.log(`📍 Server: http://localhost:${PORT}`);
-            console.log(`🔗 Blockchain: ${blockchainMode}`);
-            console.log('====================================\n');
+            console.log('╔═══════════════════════════════════════════════════════╗');
+            console.log('║         ✅ VOTEGUARD SERVER RUNNING!                 ║');
+            console.log('╚═══════════════════════════════════════════════════════╝');
+            console.log(`📍 Server URL:    http://localhost:${PORT}`);
+            console.log(`🔗 Blockchain:    Sepolia Testnet (Live)`);
+            console.log(`📜 Contract:      ${process.env.CONTRACT_ADDRESS || 'Not set'}`);
+            console.log(`🌐 CORS Origin:   ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+            console.log('╚═══════════════════════════════════════════════════════╝\n');
+            console.log('💡 TEAM SYNC: All team members connected to this server');
+            console.log('   will see the SAME data from Sepolia blockchain!\n');
 
             // Initialize RSA key exchange mechanism
             keyExchangeService.generateKeyPair();
@@ -71,12 +81,15 @@ async function startServer() {
             electionController.startElectionStatusUpdater();
         });
     } catch (error) {
-        console.error('\n❌ FATAL: Server failed to start:', error.message);
+        console.error('\n╔═══════════════════════════════════════════════════════╗');
+        console.error('║  ❌ FATAL: SERVER FAILED TO START                    ║');
+        console.error('╚═══════════════════════════════════════════════════════╝\n');
+        console.error('Error:', error.message);
         console.error(error.stack);
-        console.error('\n💡 This is a critical error. Check:');
-        console.error('   1. Database connection (DATABASE_URL)');
-        console.error('   2. Port availability (PORT=5001)');
-        console.error('   3. Required dependencies installed\n');
+        console.error('\n💡 Common issues:');
+        console.error('   - Database connection (DATABASE_URL)');
+        console.error('   - Port already in use (PORT=5001)');
+        console.error('   - Missing npm packages (run: npm install)\n');
         process.exit(1);
     }
 }

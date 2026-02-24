@@ -1,0 +1,87 @@
+[
+  {
+    "name": "DATABASE_URL",
+    "value": "postgresql://postgres.zqvsrkzqpwvwytfovwzt:VoteGuard2026Admin@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true",
+    "slotSetting": false
+  },
+  {
+    "name": "DIRECT_URL",
+    "value": "postgresql://postgres.zqvsrkzqpwvwytfovwzt:VoteGuard2026Admin@aws-1-ap-south-1.pooler.supabase.com:5432/postgres",
+    "slotSetting": false
+  },
+  {
+    "name": "JWT_SECRET",
+    "value": "supersecret",
+    "slotSetting": false
+  },
+  {
+    "name": "EMAIL_USER",
+    "value": "mouniksai9@gmail.com",
+    "slotSetting": false
+  },
+  {
+    "name": "EMAIL_PASS",
+    "value": "zfav xefw gdmq zgrv",
+    "slotSetting": false
+  },
+  {
+    "name": "FACE_API_KEY",
+    "value": "TeI4Wh4bqmNasWEI1CzPjXBTaZQn9h9R",
+    "slotSetting": false
+  },
+  {
+    "name": "FACE_API_SECRET",
+    "value": "U_fVQX9MAeVwSWvX5kEZHBoXHcTy4txR",
+    "slotSetting": false
+  },
+  {
+    "name": "FACE_API_URL",
+    "value": "https://api-us.faceplusplus.com/facepp/v3/compare",
+    "slotSetting": false
+  },
+  {
+    "name": "AES_SECRET_KEY",
+    "value": "VoteGuard2026SecretKey32BytesLong!",
+    "slotSetting": false
+  },
+  {
+    "name": "USE_JSON_BLOCKCHAIN",
+    "value": "false",
+    "slotSetting": false
+  },
+  {
+    "name": "BLOCKCHAIN_NETWORK",
+    "value": "sepolia",
+    "slotSetting": false
+  },
+  {
+    "name": "ALCHEMY_API_KEY",
+    "value": "pzdCNUvpnwmLF32CHOX2b",
+    "slotSetting": false
+  },
+  {
+    "name": "SEPOLIA_PRIVATE_KEY",
+    "value": "0x817f4a7d8e13157eebc5329dea6e863603b1d5eca312754936ac45ae1d01c42d",
+    "slotSetting": false
+  },
+  {
+    "name": "CONTRACT_ADDRESS",
+    "value": "0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2",
+    "slotSetting": false
+  },
+  {
+    "name": "ETHERSCAN_API_KEY",
+    "value": "6KB3QNBWRX7G7DHY533MN5T26BJ4FPQH3M",
+    "slotSetting": false
+  },
+  {
+    "name": "PORT",
+    "value": "8080",
+    "slotSetting": false
+  },
+  {
+    "name": "FRONTEND_URL",
+    "value": "https://your-frontend-url.com",
+    "slotSetting": false
+  }
+]

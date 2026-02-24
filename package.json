@@ -8,7 +8,8 @@
     "test:watch": "jest --watch",
     "test:unit": "jest --testPathPattern=__tests__/unit",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "npx hardhat compile"
   },
   "repository": {
     "type": "git",

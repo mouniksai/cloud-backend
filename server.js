@@ -48,7 +48,7 @@ async function startServer() {
             console.log('✅ Blockchain service ready!\n');
         } catch (blockchainError) {
             console.error('\n╔═══════════════════════════════════════════════════════╗');
-            console.error('║  ❌ BLOCKCHAIN INITIALIZATION FAILED                  ║');
+            console.error('║  ⚠️  BLOCKCHAIN INITIALIZATION FAILED                 ║');
             console.error('╚═══════════════════════════════════════════════════════╝\n');
             console.error('Error:', blockchainError.message);
             console.error('\n💡 TROUBLESHOOTING CHECKLIST:');
@@ -57,8 +57,8 @@ async function startServer() {
             console.error('   3. ✓ Set CONTRACT_ADDRESS=0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2');
             console.error('   4. ✓ Set ALCHEMY_API_KEY (get from https://dashboard.alchemy.com/)');
             console.error('   5. ✓ Set SEPOLIA_PRIVATE_KEY (export from MetaMask)\n');
-            console.error('❌ Server cannot start without blockchain connection.\n');
-            process.exit(1);
+            console.error('⚠️  Server will start WITHOUT blockchain features. Fix the blockchain config to enable voting.\n');
+            // Don't exit - allow server to start without blockchain
         }
 
         // Start Express server

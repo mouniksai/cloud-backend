@@ -5,22 +5,25 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
 const path = require('path');
+const providerConfig = require('../config/blockchainProvider');
 require('dotenv').config();
 
 /**
  * ============================================================
- * VOTEGUARD BLOCKCHAIN SERVICE - SEPOLIA ONLY
+ * VOTEGUARD BLOCKCHAIN SERVICE - MULTI-PROVIDER SUPPORT
  * ============================================================
  * 
  * CRITICAL: This service ONLY connects to Sepolia testnet
  * - NO local blockchain support (prevents sync issues)
  * - NO blockchain_data.json files (everything on Sepolia)
  * - One contract address for entire team
+ * - Supports multiple RPC providers (Alchemy, GCP, etc.)
  * 
  * REQUIRED ENV VARIABLES:
  * - BLOCKCHAIN_NETWORK: Must be 'sepolia'
+ * - BLOCKCHAIN_PROVIDER: 'alchemy' or 'gcp' (default: gcp)
  * - CONTRACT_ADDRESS: Your deployed contract (0xE08b2c...)
- * - ALCHEMY_API_KEY: Your Alchemy API key
+ * - GCP_BLOCKCHAIN_ENDPOINT: GCP RPC endpoint (or ALCHEMY_API_KEY for Alchemy)
  * - SEPOLIA_PRIVATE_KEY: Your wallet's private key
  * 
  * ============================================================
@@ -42,7 +45,7 @@ class BlockchainServiceV2 {
      */
     async initialize() {
         try {
-            console.log(`\n🔗 Connecting to Sepolia blockchain...`);
+            console.log(`\n🔗 Connecting to blockchain...`);
 
             // FORCE Sepolia network only
             if (this.network !== 'sepolia') {
@@ -53,15 +56,10 @@ class BlockchainServiceV2 {
                 );
             }
 
-            // Validate required environment variables
-            const alchemyKey = process.env.ALCHEMY_API_KEY;
-            if (!alchemyKey) {
-                throw new Error(
-                    '❌ ALCHEMY_API_KEY not set in .env\n' +
-                    '   Get your free API key from: https://dashboard.alchemy.com/'
-                );
-            }
+            // Validate provider configuration
+            providerConfig.validate();
 
+            // Validate required environment variables
             const privateKey = process.env.SEPOLIA_PRIVATE_KEY;
             if (!privateKey) {
                 throw new Error(
@@ -78,10 +76,9 @@ class BlockchainServiceV2 {
                 );
             }
 
-            // Setup Sepolia provider
-            this.provider = new ethers.JsonRpcProvider(
-                `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
-            );
+            // Setup provider using the abstraction
+            const rpcUrl = providerConfig.getRpcUrl();
+            this.provider = new ethers.JsonRpcProvider(rpcUrl);
 
             // Setup signer
             this.signer = new ethers.Wallet(privateKey, this.provider);
@@ -97,12 +94,13 @@ class BlockchainServiceV2 {
             // Verify connection by reading chain length
             const chainLength = await this.contract.chainLength();
 
-            console.log('✅ Connected to Sepolia blockchain');
-            console.log(`├─ Network: Sepolia Testnet (Chain ID: 11155111)`);
+            console.log('✅ Connected to blockchain');
+            console.log(`├─ Provider: ${providerConfig.getProviderName()}`);
+            console.log(`├─ Network: ${providerConfig.getNetworkName()} (Chain ID: ${providerConfig.getChainId()})`);
             console.log(`├─ Contract: ${this.contractAddress}`);
             console.log(`├─ Signer: ${this.signer.address}`);
             console.log(`├─ Chain Length: ${chainLength}`);
-            console.log(`└─ Explorer: https://sepolia.etherscan.io/address/${this.contractAddress}\n`);
+            console.log(`└─ Explorer: ${providerConfig.getExplorerUrl()}/address/${this.contractAddress}\n`);
 
             this.initialized = true;
             return true;

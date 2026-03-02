@@ -3,7 +3,7 @@ require("dotenv").config();
 
 /**
  * ============================================================
- * VOTEGUARD - HARDHAT CONFIGURATION (SEPOLIA-FIRST)
+ * VOTEGUARD - HARDHAT CONFIGURATION (MULTI-PROVIDER SUPPORT)
  * ============================================================
  * 
  * CRITICAL FOR TEAM SYNC:
@@ -12,13 +12,37 @@ require("dotenv").config();
  * - Use the SAME CONTRACT_ADDRESS across all team members
  * 
  * REQUIRED ENVIRONMENT VARIABLES (.env):
- * - ALCHEMY_API_KEY: Your Alchemy API key (free tier)
+ * - BLOCKCHAIN_PROVIDER: 'alchemy' or 'gcp' (default: gcp)
+ * - GCP_BLOCKCHAIN_ENDPOINT: GCP RPC endpoint (if using GCP)
+ * - ALCHEMY_API_KEY: Your Alchemy API key (if using Alchemy)
  * - SEPOLIA_PRIVATE_KEY: Your wallet's private key (without 0x)
  * - ETHERSCAN_API_KEY: (Optional) For contract verification
  * 
- * Get started: https://dashboard.alchemy.com/
  * ============================================================
  */
+
+// Helper function to get RPC URL based on provider
+function getRpcUrl() {
+    const provider = process.env.BLOCKCHAIN_PROVIDER || 'gcp';
+
+    if (provider === 'gcp') {
+        const gcpEndpoint = process.env.GCP_BLOCKCHAIN_ENDPOINT;
+        if (gcpEndpoint) {
+            return gcpEndpoint;
+        }
+        console.warn('⚠️  GCP_BLOCKCHAIN_ENDPOINT not set, using Alchemy as fallback');
+    }
+
+    // Fallback to Alchemy or if explicitly set
+    if (provider === 'alchemy' || !process.env.GCP_BLOCKCHAIN_ENDPOINT) {
+        const alchemyKey = process.env.ALCHEMY_API_KEY;
+        if (alchemyKey) {
+            return `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`;
+        }
+    }
+
+    return "";
+}
 
 module.exports = {
     solidity: {
@@ -38,9 +62,7 @@ module.exports = {
         // This is your team's "source of truth"
         // Deploy here once, everyone connects to same contract
         sepolia: {
-            url: process.env.ALCHEMY_API_KEY
-                ? `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
-                : "",
+            url: getRpcUrl(),
             accounts: process.env.SEPOLIA_PRIVATE_KEY
                 ? [process.env.SEPOLIA_PRIVATE_KEY]
                 : [],

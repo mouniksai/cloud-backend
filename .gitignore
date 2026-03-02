@@ -151,3 +151,5 @@ typechain-types/
 
 # Hardhat Ignition
 ignition/deployments/chain-31337/
+
+.azure/

@@ -54,9 +54,10 @@ async function startServer() {
             console.error('\n💡 TROUBLESHOOTING CHECKLIST:');
             console.error('   1. ✓ Copy .env.example to .env');
             console.error('   2. ✓ Set BLOCKCHAIN_NETWORK=sepolia');
-            console.error('   3. ✓ Set CONTRACT_ADDRESS=0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2');
-            console.error('   4. ✓ Set ALCHEMY_API_KEY (get from https://dashboard.alchemy.com/)');
-            console.error('   5. ✓ Set SEPOLIA_PRIVATE_KEY (export from MetaMask)\n');
+            console.error('   3. ✓ Set BLOCKCHAIN_PROVIDER=gcp (or alchemy)');
+            console.error('   4. ✓ Set CONTRACT_ADDRESS=0xE08b2c325F4e64DDb7837b6a4b1443935473ECB2');
+            console.error('   5. ✓ Set GCP_BLOCKCHAIN_ENDPOINT (or ALCHEMY_API_KEY if using Alchemy)');
+            console.error('   6. ✓ Set SEPOLIA_PRIVATE_KEY (export from MetaMask)\n');
             console.error('⚠️  Server will start WITHOUT blockchain features. Fix the blockchain config to enable voting.\n');
             // Don't exit - allow server to start without blockchain
         }

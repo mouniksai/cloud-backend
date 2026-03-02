@@ -12,6 +12,7 @@ module.exports = function (req, res, next) {
 
     // Check if no token
     if (!token) {
+        console.warn(`[AUTH] No token provided for ${req.method} ${req.path}`);
         return res.status(401).json({ message: "No token, authorization denied" });
     }
 
@@ -24,9 +25,11 @@ module.exports = function (req, res, next) {
 
         // 3. Add user payload to request object
         req.user = decoded;
+        console.log(`[AUTH] Token valid for user ${decoded.user_id}, role: ${decoded.role}`);
         next(); // Move to the next function (the controller)
 
     } catch (err) {
+        console.error(`[AUTH] Invalid token for ${req.method} ${req.path}:`, err.message);
         res.status(401).json({ message: "Token is not valid" });
     }
 };

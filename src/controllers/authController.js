@@ -71,16 +71,25 @@ exports.registerUser = async (req, res) => {
             return newUser;
         });
 
-        const token = jwt.sign({ user_id: result.userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        // Generate token with role included (critical for admin access)
+        const token = jwt.sign(
+            { 
+                user_id: result.userId,
+                role: result.role
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "1h" }
+        );
 
-        // Set secure cookie
+        // Set secure cookie with production-friendly settings
         res.cookie('voteGuardToken', token, {
             httpOnly: false, // Allow frontend JavaScript access
             secure: process.env.NODE_ENV === 'production', // HTTPS in production
-            sameSite: 'lax',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-domain in production
             maxAge: 60 * 60 * 1000 // 1 hour
         });
 
+        console.log(`[AUTH] User registered: ${result.username}, role: ${result.role}`);
         res.json({ token, user: result });
 
     } catch (err) {
@@ -178,15 +187,16 @@ exports.verifyOtp = async (req, res) => {
             { expiresIn: "1h" }
         );
 
-        // Set secure cookie
+        // Set secure cookie with production-friendly settings
         res.cookie('voteGuardToken', token, {
             httpOnly: false, // Allow frontend JavaScript access
             secure: process.env.NODE_ENV === 'production', // HTTPS in production
-            sameSite: 'lax',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-domain in production
             maxAge: 60 * 60 * 1000 // 1 hour
         });
 
         // 3. Send final data
+        console.log(`[AUTH] User logged in: ${user.username}, role: ${user.role}`);
         res.json({
             token,
             user: {

@@ -66,7 +66,8 @@ exports.getDashboardData = async (req, res) => {
                 date: new Date(vote.timestamp).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
-                    day: 'numeric'
+                    day: 'numeric',
+                    timeZone: 'UTC'
                 }),
                 receiptHash: vote.receiptHash,
                 status: "Confirmed on Blockchain",

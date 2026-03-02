@@ -1,3 +1,6 @@
+// Force UTC timezone regardless of deployment region (fixes Azure Southeast Asia UTC+8 offset)
+process.env.TZ = 'UTC';
+
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

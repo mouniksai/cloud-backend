@@ -73,11 +73,11 @@ exports.registerUser = async (req, res) => {
 
         // Generate token with role included (critical for admin access)
         const token = jwt.sign(
-            { 
+            {
                 user_id: result.userId,
                 role: result.role
-            }, 
-            process.env.JWT_SECRET, 
+            },
+            process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
 

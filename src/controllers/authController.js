@@ -82,14 +82,20 @@ exports.registerUser = async (req, res) => {
         );
 
         // Set secure cookie with production-friendly settings
-        res.cookie('voteGuardToken', token, {
+        const cookieOptions = {
             httpOnly: false, // Allow frontend JavaScript access
             secure: process.env.NODE_ENV === 'production', // HTTPS in production
             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-domain in production
-            maxAge: 60 * 60 * 1000 // 1 hour
-        });
-
+            maxAge: 60 * 60 * 1000, // 1 hour
+            path: '/' // Ensure cookie is available for all paths
+        };
+        
+        res.cookie('voteGuardToken', token, cookieOptions);
+        
         console.log(`[AUTH] User registered: ${result.username}, role: ${result.role}`);
+        console.log(`[AUTH] Cookie settings:`, cookieOptions);
+        console.log(`[AUTH] CORS Origin: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+        
         res.json({ token, user: result });
 
     } catch (err) {
@@ -188,15 +194,21 @@ exports.verifyOtp = async (req, res) => {
         );
 
         // Set secure cookie with production-friendly settings
-        res.cookie('voteGuardToken', token, {
+        const cookieOptions = {
             httpOnly: false, // Allow frontend JavaScript access
             secure: process.env.NODE_ENV === 'production', // HTTPS in production
             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-domain in production
-            maxAge: 60 * 60 * 1000 // 1 hour
-        });
-
+            maxAge: 60 * 60 * 1000, // 1 hour
+            path: '/' // Ensure cookie is available for all paths
+        };
+        
+        res.cookie('voteGuardToken', token, cookieOptions);
+        
         // 3. Send final data
         console.log(`[AUTH] User logged in: ${user.username}, role: ${user.role}`);
+        console.log(`[AUTH] Cookie settings:`, cookieOptions);
+        console.log(`[AUTH] CORS Origin: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+        
         res.json({
             token,
             user: {
@@ -219,7 +231,7 @@ exports.logoutUser = async (req, res) => {
         res.clearCookie('voteGuardToken', {
             httpOnly: false,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Must match login cookie settings
             path: '/'
         });
 

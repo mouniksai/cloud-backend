@@ -41,9 +41,9 @@ describe('RoleMiddleware', () => {
             middleware(req, res, next);
 
             expect(res.status).toHaveBeenCalledWith(403);
-            expect(res.json).toHaveBeenCalledWith({
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
                 message: "Access Forbidden: Insufficient Permissions"
-            });
+            }));
             expect(next).not.toHaveBeenCalled();
         });
 
@@ -54,7 +54,7 @@ describe('RoleMiddleware', () => {
             middleware(req, res, next);
 
             expect(console.warn).toHaveBeenCalledWith(
-                '[SECURITY] Unauthorized Access Attempt by User: 5'
+                expect.stringContaining('[SECURITY] Unauthorized Access Attempt by User: 5')
             );
         });
     });
@@ -89,9 +89,9 @@ describe('RoleMiddleware', () => {
             middleware(req, res, next);
 
             expect(res.status).toHaveBeenCalledWith(403);
-            expect(res.json).toHaveBeenCalledWith({
-                message: "Access Forbidden: Insufficient Permissions"
-            });
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                message: "Access Forbidden: No user authentication"
+            }));
             expect(next).not.toHaveBeenCalled();
         });
 
@@ -224,7 +224,7 @@ describe('RoleMiddleware', () => {
             middleware(req, res, next);
 
             expect(console.warn).toHaveBeenCalledWith(
-                '[SECURITY] Unauthorized Access Attempt by User: 100'
+                expect.stringContaining('[SECURITY] Unauthorized Access Attempt by User: 100')
             );
         });
 

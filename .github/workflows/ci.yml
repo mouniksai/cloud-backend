@@ -1,0 +1,127 @@
+name: CI - VoteGuard Backend
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ============================================================
+  # JOB 1: Lint & Code Quality
+  # ============================================================
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for syntax errors
+        run: node --check server.js
+
+      - name: Check source files for syntax errors
+        run: |
+          for file in $(find src -name "*.js" -type f); do
+            node --check "$file" || exit 1
+          done
+
+  # ============================================================
+  # JOB 2: Unit Tests (Matrix: Node 18 + 20)
+  # ============================================================
+  test:
+    name: Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['18.x', '20.x']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm test
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-test-jwt-secret-key
+          AES_SECRET_KEY: ci-test-aes-secret-key-32bytes-long
+          EMAIL_USER: ci@voteguard.com
+          EMAIL_PASS: ci-test-password
+          FACE_API_KEY: ci-test-face-api-key
+          FACE_API_SECRET: ci-test-face-api-secret
+          FACE_API_URL: https://api-test.faceplusplus.com/facepp/v3/compare
+
+      - name: Upload coverage report
+        if: matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: coverage/
+          retention-days: 14
+
+  # ============================================================
+  # JOB 3: Security Audit
+  # ============================================================
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (production)
+        run: npm audit --production --audit-level=high
+        continue-on-error: true
+
+  # ============================================================
+  # JOB 4: Build Check (Hardhat compile)
+  # ============================================================
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile smart contracts
+        run: npx hardhat compile

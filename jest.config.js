@@ -4,13 +4,13 @@ module.exports = {
     collectCoverageFrom: [
         'src/**/*.js',
         '!src/config/db.js', // Exclude database connection
-        '!src/__mocks__/**', // Exclude mocks
+        '!testing/mocks/**', // Exclude mocks
         '!**/node_modules/**'
     ],
     testMatch: [
-        '**/__tests__/**/*.test.js'
+        '**/testing/**/*.test.js'
     ],
-    setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js'],
+    setupFilesAfterEnv: ['<rootDir>/testing/setup.js'],
     coverageThreshold: {
         global: {
             branches: 10,

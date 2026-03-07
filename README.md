@@ -25,6 +25,8 @@ Built with **Node.js** and **Express**, it leverages **Prisma ORM** with **Postg
 
 ---
 
+> **[Full Documentation →](https://sanjjiiev.github.io/voteguard-docs/)** — Complete API reference, setup guides, and architecture overview.
+
 ## Features
 
 ###  Secure Authentication & Integrity

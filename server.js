@@ -31,6 +31,7 @@ app.use('/api/elections', require('./src/routes/electionRoutes'));
 app.use('/api/verification', require('./src/routes/verificationRoutes'));
 app.use('/api/keys', require('./src/routes/keyRoutes'));
 app.use('/api/blockchain', require('./src/routes/blockchainRoutes'));
+app.use('/api/fingerprint', require('./src/routes/fingerprintRoutes'));
 
 const PORT = process.env.PORT || 5001;
 

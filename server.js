@@ -33,6 +33,10 @@ app.use('/api/keys', require('./src/routes/keyRoutes'));
 app.use('/api/blockchain', require('./src/routes/blockchainRoutes'));
 app.use('/api/fingerprint', require('./src/routes/fingerprintRoutes'));
 
+// NEW: Observer and Public routes for enhanced monitoring and transparency
+app.use('/api/observer', require('./src/routes/observerRoutes'));
+app.use('/api/public', require('./src/routes/publicRoutes'));
+
 const PORT = process.env.PORT || 5001;
 
 // ============================================================

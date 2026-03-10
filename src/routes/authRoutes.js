@@ -9,6 +9,11 @@ router.post('/login', authController.loginUser); // Now returns requires2FA: tru
 router.post('/verify-otp', authController.verifyOtp); // NEW ROUTE
 router.post('/logout', authMiddleware, authController.logoutUser); // LOGOUT ROUTE
 
+// Forgot Password Routes
+router.post('/forgot-password', authController.forgotPassword); // Send OTP
+router.post('/verify-reset-otp', authController.verifyResetOtp); // Verify OTP
+router.post('/reset-password', authController.resetPassword); // Reset password
+
 router.get('/dashboard', authMiddleware, (req, res) => {
     res.json({ message: "Secret Dashboard", userId: req.user.user_id });
 });

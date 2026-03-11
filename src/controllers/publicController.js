@@ -22,7 +22,7 @@ exports.verifyReceipt = async (req, res) => {
         console.log(`[PUBLIC] Receipt verification requested: ${receiptHash.substring(0, 10)}...`);
 
         // Verify receipt on blockchain
-        const vote = await blockchainService.verifyVoteByReceipt(receiptHash);
+        const vote = await blockchainService.verifyVote(receiptHash);
 
         if (vote) {
             // Return verification result WITHOUT revealing vote choice
